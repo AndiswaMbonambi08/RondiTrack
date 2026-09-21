@@ -12,7 +12,7 @@ A terminal or IDE (Visual Studio, Rider, VS Code)
 ## Steps
 Clone the repo: git clone https://github.com/AndiswaMbonambi08/RondiTrack.git
 
-                cd RondiTrack
+cd RondiTrack
                 
 Run the app:    dotnet run
 
