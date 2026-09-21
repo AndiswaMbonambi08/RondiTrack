@@ -11,8 +11,11 @@ A terminal or IDE (Visual Studio, Rider, VS Code)
 
 ## Steps
 Clone the repo: git clone https://github.com/AndiswaMbonambi08/RondiTrack.git
+
                 cd RondiTrack
+                
 Run the app:    dotnet run
+
 Open the Scalar UI: http://localhost:5051/scalar/v1
 
 ## Usage
