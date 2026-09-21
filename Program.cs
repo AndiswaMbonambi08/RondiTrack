@@ -1,4 +1,5 @@
 //Wires up DI, OpenAPI/Scalar, maps the endpoint groups, seeds one stokvel with members on startup.
+using Microsoft.AspNetCore.OpenApi;
 using RondiTrack.Data;
 using RondiTrack.Domain;
 using RondiTrack.Endpoints;
