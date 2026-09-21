@@ -1,4 +1,5 @@
-//The Stokvel entity. Owns its member list privately, enforces the membership rules (no duplicates, no inactive users), validates the contribution amount.
+//The Stokvel entity. Owns its member list privately, enforces the membership rules (no duplicates, no inactive users), 
+//validates the contribution amount.
 using RondiTrack.Domain.Exceptions;
 
 namespace RondiTrack.Domain;
