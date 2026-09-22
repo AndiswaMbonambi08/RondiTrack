@@ -482,3 +482,44 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+NOTES.md
+STOKVEL_ID: 39df4cb6-0692-47ba-8278-2cb83bec0047
+
+USER_ID: [
+  "33eb279c-9ab1-4775-8f3a-d3f319ce289d",
+  "cde66bea-f7b7-4bfd-b2b0-00f1165e237d"
+]
+
+## Testing issue — Scalar not sending Idempotency-Key header / id not binding (2026-09-22)
+
+**Endpoint:** POST /api/stokvels/{id}/contributions
+
+**Problem 1 — id path variable not propagating**
+Typed the real stokvel id (39df4cb6-0692-47ba-8278-2cb83bec0047) into the "Variables"
+field for `id`, but the generated Code Snippet kept showing the old placeholder
+(123e4567-e89b-12d3-a456-426614174000) instead. Value wasn't committing to the actual
+outgoing request.
+
+**Problem 2 — Idempotency-Key header not being sent**
+Header showed as checked/ticked in the request builder (Idempotency-Key: key-1), but the
+response panel reported only 2 Request Headers received, not 3 — meaning the header
+wasn't actually reaching the server. Got back a 400 Bad Request with:
+"An Idempotency-Key header is required to record a contribution."
+
+**What this confirms works correctly:**
+The Problem Details (RFC 9457) error shape is functioning as designed — the response
+had the correct type/title/status/detail fields even though the request itself was
+malformed on the Scalar side, not the API side.
+
+**Next step:** retry with header deleted and re-added from scratch, and id field
+retyped and confirmed in the Code Snippet before sending.
+
+## Getting used to Scalar (2026-09-22)
+
+Still learning my way around the Scalar UI — ran into a couple of quirks testing the
+contributions endpoint (see entry above: id variable not propagating into the request,
+Idempotency-Key header not always registering). Not investigating further right now
+since the assignment doesn't require exhaustive test coverage, just demonstrating the
+core idempotency guarantee. Will revisit if the same issue blocks something required
+later.
