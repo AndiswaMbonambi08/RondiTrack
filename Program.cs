@@ -29,9 +29,11 @@ using (var scope = app.Services.CreateScope())
     var stokvelRepo = scope.ServiceProvider.GetRequiredService<IStokvelRepository>();
 
     var users = await userRepo.GetAllAsync();
+    var activeUsers = users.Where(u => u.IsActive).ToList();
+
     var stokvel = new Stokvel("Ubuntu Savings Circle", 500m);
-    stokvel.AddMember(users[0]);
-    stokvel.AddMember(users[1]);
+    stokvel.AddMember(activeUsers[0]);
+    stokvel.AddMember(activeUsers[1]);
     await stokvelRepo.AddAsync(stokvel);
 }
 
