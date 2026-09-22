@@ -36,4 +36,3 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
-/*so what we were basically doing for this is assignment is tis....the changes i made in each file and while i doid it the way i did it, why i chose the classes and functions i chose...fuction oof all of them...must exaplain in human terms for me to actually understand what is it we were doing what was the point*/
