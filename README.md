@@ -66,4 +66,37 @@ Duplicate membership:
 Invalid stokvel creation:
 { "error": "Stokvel must have a name and contribution > 0." }
 
+## DTOs and mapping (Assignment 4.2)
+Every endpoint now binds to a request DTO and returns a response DTO — no `User` or
+`Stokvel` entity crosses the HTTP boundary in either direction. Mapping is done by hand
+with small extension methods (`Mapping/`), one file per entity. Manual mapping is the
+right call here regardless of the "no external libraries" constraint: this project moves
+money, and a reflection-based mapper could silently expose or bind a field nobody
+intended (like `IsActive` or the internal member list) the moment a new property is
+added to an entity. Hand-written mapping fails loudly at compile time instead.
 
+## Service layer
+`IStokvelService` holds the two operations that involve a decision spanning more than
+one entity: adding a member (checks both the stokvel and the user) and recording a
+contribution (checks the stokvel, the user, membership, duplicate-cycle, and the
+idempotency key). Everything else — plain CRUD — stays in the endpoint layer, since it's
+a straightforward lookup with no cross-entity decision to make.
+
+## Idempotency design
+The client sends an `Idempotency-Key` header with each contribution request. The service
+checks the in-memory idempotency store first:
+- No record for that key → the contribution is recorded normally, and the key is saved
+  alongside the request and the response.
+- A record exists and the incoming request matches the stored one → the original response
+  is returned as-is, with no new contribution recorded.
+- A record exists but the incoming request differs → the request is rejected with
+  422 Unprocessable Entity, since reusing a key for a different payload is a contradiction,
+  not a retry.
+
+## 400 vs 422
+400 Bad Request is used for input that's wrong on its own, regardless of state — a
+negative contribution amount, a missing name, an invalid email. 422 Unprocessable Entity
+is used for input that's well-formed but conflicts with something outside the payload
+itself — specifically, reusing an idempotency key with a different request body. 409
+Conflict is reserved for state conflicts on the resource itself — a duplicate member, or
+a duplicate contribution for a cycle that's already been paid.
