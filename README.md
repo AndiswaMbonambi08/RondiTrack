@@ -109,7 +109,7 @@ Idempotency key reused with different data:
   "detail": "This idempotency key was already used with a different request."
 }
 
-## DTOs and mapping (Assignment 4.2)
+## DTOs and mapping
 Every endpoint now binds to a request DTO and returns a response DTO — no `User` or
 `Stokvel` entity crosses the HTTP boundary in either direction. Mapping is done by hand
 with small extension methods (`Mapping/`), one file per entity. Manual mapping is the
@@ -136,7 +136,6 @@ checks the in-memory idempotency store first:
   422 Unprocessable Entity, since reusing a key for a different payload is a contradiction,
   not a retry.
 
-## 400 vs 422
 ## 400 vs 422
 This distinction is applied in the contribution-recording endpoint
 (`POST /api/stokvels/{id}/contributions`): 400 Bad Request is used for input that's
