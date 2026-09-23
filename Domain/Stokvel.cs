@@ -33,10 +33,10 @@ public class Stokvel
         ArgumentNullException.ThrowIfNull(user);
 
         if (!user.IsActive)
-            throw new InactiveUserException($"'{user.FullName}' is inactive and cannot join a stokvel.");
+            throw new ConflictException($"'{user.FullName}' is inactive and cannot join a stokvel.");
 
         if (_memberIds.Contains(user.Id))
-            throw new DuplicateMemberException($"'{user.FullName}' is already a member of this stokvel.");
+            throw new ConflictException($"'{user.FullName}' is already a member of this stokvel.");
 
         _memberIds.Add(user.Id);
     }
@@ -44,20 +44,20 @@ public class Stokvel
     public void RemoveMember(Guid userId)
     {
         if (!_memberIds.Remove(userId))
-            throw new MemberNotFoundException("That user is not a member of this stokvel.");
+            throw new NotFoundException("That user is not a member of this stokvel.");
     }
 
-    public Contribution RecordContribution(User user, string cycle, decimal amount)
+    public Contribution RecordContribution(User user, Guid contributionCycleId, decimal amount)
     {
         ArgumentNullException.ThrowIfNull(user);
 
         if (!_memberIds.Contains(user.Id))
-            throw new MemberNotFoundException($"'{user.FullName}' is not a member of this stokvel and cannot contribute.");
+            throw new NotFoundException($"'{user.FullName}' is not a member of this stokvel and cannot contribute.");
 
-        if (_contributions.Any(c => c.UserId == user.Id && c.Cycle == cycle))
-            throw new DuplicateContributionException($"'{user.FullName}' has already recorded a contribution for cycle '{cycle}'.");
+        if (_contributions.Any(c => c.UserId == user.Id && c.ContributionCycleId == contributionCycleId))
+            throw new ConflictException($"'{user.FullName}' has already recorded a contribution for this cycle.");
 
-        var contribution = new Contribution(user.Id, cycle, amount);
+        var contribution = new Contribution(user.Id, contributionCycleId, amount);
         _contributions.Add(contribution);
         return contribution;
     }
