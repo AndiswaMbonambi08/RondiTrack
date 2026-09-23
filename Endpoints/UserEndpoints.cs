@@ -1,12 +1,14 @@
-//Maps the /api/users HTTP routes (CRUD) to the domain and repository. 
-//Also holds the small request records for POST/PUT bodies.
+// Maps every /api/users route. No try/catch here anymore — validation happens via
+// ValidationFilter before this code runs, and any exception thrown here is caught by
+// the centralized RondiTrackExceptionHandler, not locally.
 using RondiTrack.Data;
 using RondiTrack.Domain;
+using RondiTrack.Domain.Exceptions;
+using RondiTrack.Dtos;
+using RondiTrack.Mapping;
+using RondiTrack.Validation;
 
 namespace RondiTrack.Endpoints;
-
-public record CreateUserRequest(string FullName, string Email);
-public record UpdateUserRequest(string FullName, string Email);
 
 public static class UserEndpoints
 {
@@ -15,48 +17,38 @@ public static class UserEndpoints
         var group = app.MapGroup("/api/users").WithTags("Users");
 
         group.MapGet("/", async (IUserRepository repo) =>
-            Results.Ok(await repo.GetAllAsync()));
+        {
+            var users = await repo.GetAllAsync();
+            return Results.Ok(users.Select(u => u.ToResponse()));
+        });
 
         group.MapGet("/{id:guid}", async (Guid id, IUserRepository repo) =>
         {
-            var user = await repo.GetByIdAsync(id);
-            return user is null ? Results.NotFound() : Results.Ok(user);
+            var user = await repo.GetByIdAsync(id)
+                ?? throw new NotFoundException("User not found.");
+            return Results.Ok(user.ToResponse());
         });
 
-        group.MapPost("/", async (CreateUserRequest request, IUserRepository repo) =>
+        group.MapPost("/", async (UserRequest request, IUserRepository repo) =>
         {
-            try
-            {
-                var user = new User(request.FullName, request.Email);
-                await repo.AddAsync(user);
-                return Results.Created($"/api/users/{user.Id}", user);
-            }
-            catch (ArgumentException ex)
-            {
-                return Results.BadRequest(new { error = ex.Message });
-            }
-        });
+            var user = new User(request.FullName, request.Email);
+            await repo.AddAsync(user);
+            return Results.Created($"/api/users/{user.Id}", user.ToResponse());
+        }).AddEndpointFilter<ValidationFilter<UserRequest>>();
 
-        group.MapPut("/{id:guid}", async (Guid id, UpdateUserRequest request, IUserRepository repo) =>
+        group.MapPut("/{id:guid}", async (Guid id, UserRequest request, IUserRepository repo) =>
         {
-            var user = await repo.GetByIdAsync(id);
-            if (user is null) return Results.NotFound();
+            var user = await repo.GetByIdAsync(id)
+                ?? throw new NotFoundException("User not found.");
 
-            try
-            {
-                user.UpdateDetails(request.FullName, request.Email);
-                return Results.Ok(user);
-            }
-            catch (ArgumentException ex)
-            {
-                return Results.BadRequest(new { error = ex.Message });
-            }
-        });
+            user.UpdateDetails(request.FullName, request.Email);
+            return Results.Ok(user.ToResponse());
+        }).AddEndpointFilter<ValidationFilter<UserRequest>>();
 
         group.MapDelete("/{id:guid}", async (Guid id, IUserRepository repo) =>
         {
-            var user = await repo.GetByIdAsync(id);
-            if (user is null) return Results.NotFound();
+            var user = await repo.GetByIdAsync(id)
+                ?? throw new NotFoundException("User not found.");
 
             await repo.DeleteAsync(id);
             return Results.NoContent();
