@@ -32,41 +32,84 @@ A stokvel cannot be created without a name or with a contribution ≤ 0
 These rules reflect how stokvels operate in reality: fairness, accountability, and trust are non-negotiable.
 
 ## Example API Calls
-## Create a user
-POST /users
+
+### Create a user
+POST /api/users
 Content-Type: application/json
 
 {
-  "name": "Andiswa",
-  "isActive": true
+  "fullName": "Andiswa Mbonambi",
+  "email": "andiswa@example.com"
 }
 
-## Create a stokvel
-POST /stokvels
+### Create a stokvel
+POST /api/stokvels
 Content-Type: application/json
 
 {
   "name": "Holiday Savings",
   "contributionAmount": 500
 }
-## Join a stokvel
-POST /stokvels/{id}/members
+
+### Join a stokvel
+POST /api/stokvels/{id}/members
 Content-Type: application/json
 
 {
-  "userId": "123"
+  "userId": "<a real user id from GET /api/users>"
 }
+
+### Record a contribution (idempotent)
+POST /api/stokvels/{id}/contributions
+Content-Type: application/json
+Idempotency-Key: key-1
+
+{
+  "userId": "<a real member id>",
+  "cycle": "2026-09",
+  "amount": 500
+}
+
+Sending this exact request again with the same Idempotency-Key returns the same
+response with no new contribution recorded. Sending it again with the same key but
+a different amount or cycle returns 422 Unprocessable Entity.
+
 ## Error cases
+All errors follow RFC 9457 Problem Details (application/problem+json):
+
 Inactive user joining:
-{ "error": "Inactive users cannot join a stokvel." }
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "'Lindiwe Zulu' is inactive and cannot join a stokvel."
+}
 
 Duplicate membership:
-{ "error": "User already belongs to this stokvel." }
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "'Sipho Dlamini' is already a member of this stokvel."
+}
 
 Invalid stokvel creation:
-{ "error": "Stokvel must have a name and contribution > 0." }
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Contribution amount must be greater than zero."
+}
 
-## DTOs and mapping (Assignment 4.2)
+Idempotency key reused with different data:
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.21",
+  "title": "Unprocessable Entity",
+  "status": 422,
+  "detail": "This idempotency key was already used with a different request."
+}
+
+## DTOs and mapping
 Every endpoint now binds to a request DTO and returns a response DTO — no `User` or
 `Stokvel` entity crosses the HTTP boundary in either direction. Mapping is done by hand
 with small extension methods (`Mapping/`), one file per entity. Manual mapping is the
@@ -94,9 +137,11 @@ checks the in-memory idempotency store first:
   not a retry.
 
 ## 400 vs 422
-400 Bad Request is used for input that's wrong on its own, regardless of state — a
-negative contribution amount, a missing name, an invalid email. 422 Unprocessable Entity
-is used for input that's well-formed but conflicts with something outside the payload
-itself — specifically, reusing an idempotency key with a different request body. 409
-Conflict is reserved for state conflicts on the resource itself — a duplicate member, or
-a duplicate contribution for a cycle that's already been paid.
+This distinction is applied in the contribution-recording endpoint
+(`POST /api/stokvels/{id}/contributions`): 400 Bad Request is used for input that's
+wrong on its own, regardless of state, such as a negative contribution amount, a
+missing name, or an invalid email. 422 Unprocessable Entity is used for input that's
+well-formed but conflicts with something outside the payload itself, specifically
+reusing an idempotency key with a different request body. 409 Conflict is reserved
+for state conflicts on the resource itself, such as a duplicate member or a
+duplicate contribution for a cycle that's already been paid.
