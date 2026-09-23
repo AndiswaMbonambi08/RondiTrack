@@ -1,38 +1,58 @@
-//Custom exceptions for business-rule violations (duplicate member, inactive user, member not found). 
-//Lets the domain signal what went wrong without knowing about HTTP.
+// RondiTrack's exception hierarchy. Every exception here names one way a request can
+// legitimately fail once it's past validation, and carries the status code and title
+// the centralized handler should use for it. Validation (malformed input) is handled
+// separately by FluentValidation before code ever reaches this hierarchy.
+using Microsoft.AspNetCore.Http;
+
 namespace RondiTrack.Domain.Exceptions;
 
-public abstract class DomainException : Exception
+public abstract class RondiTrackException : Exception
 {
-    protected DomainException(string message) : base(message) { }
+    public abstract int StatusCode { get; }
+    public abstract string Title { get; }
+
+    protected RondiTrackException(string message) : base(message) { }
 }
 
-public class DuplicateMemberException : DomainException
+// A request that's well-formed on its own but fails a check that has nothing to do
+// with a specific resource or business rule (e.g. a missing required header).
+public class RequestValidationException : RondiTrackException
 {
-    public DuplicateMemberException(string message) : base(message) { }
+    public override int StatusCode => StatusCodes.Status400BadRequest;
+    public override string Title => "Bad Request";
+
+    public RequestValidationException(string message) : base(message) { }
 }
 
-public class InactiveUserException : DomainException
+// The thing the caller asked for doesn't exist.
+public class NotFoundException : RondiTrackException
 {
-    public InactiveUserException(string message) : base(message) { }
+    public override int StatusCode => StatusCodes.Status404NotFound;
+    public override string Title => "Not Found";
+
+    public NotFoundException(string message) : base(message) { }
 }
 
-public class MemberNotFoundException : DomainException
+// The request is valid and the resources involved exist, but the combination violates
+// a rule about the current state of a resource (duplicate membership, duplicate
+// contribution for a cycle already paid).
+public class ConflictException : RondiTrackException
 {
-    public MemberNotFoundException(string message) : base(message) { }
+    public override int StatusCode => StatusCodes.Status409Conflict;
+    public override string Title => "Conflict";
+
+    public ConflictException(string message) : base(message) { }
 }
 
-public class DuplicateContributionException : DomainException
+// Specifically for a reused Idempotency-Key with a different payload. Classified
+// separately from ConflictException: a duplicate contribution conflicts with the
+// STATE of the stokvel, but an idempotency mismatch conflicts with the RETRY CONTRACT
+// itself, the request contradicts an earlier promise made under the same key, not
+// the resource's current state. That distinction is why this is 422, not 409.
+public class IdempotencyConflictException : RondiTrackException
 {
-    public DuplicateContributionException(string message) : base(message) { }
-}
+    public override int StatusCode => StatusCodes.Status422UnprocessableEntity;
+    public override string Title => "Unprocessable Entity";
 
-public class ResourceNotFoundException : DomainException
-{
-    public ResourceNotFoundException(string message) : base(message) { }
-}
-
-public class IdempotencyMismatchException : DomainException
-{
-    public IdempotencyMismatchException(string message) : base(message) { }
+    public IdempotencyConflictException(string message) : base(message) { }
 }
