@@ -45,9 +45,12 @@ public class RondiTrackExceptionHandler : IExceptionHandler
         };
         problemDetails.Extensions["correlationId"] = correlationId;
 
-        httpContext.Response.StatusCode = statusCode;
-        httpContext.Response.ContentType = "application/problem+json";
-        await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+            httpContext.Response.StatusCode = statusCode;
+            await httpContext.Response.WriteAsJsonAsync(
+            problemDetails,
+            options: (System.Text.Json.JsonSerializerOptions?)null,
+            contentType: "application/problem+json",
+            cancellationToken);
 
         return true;
     }
