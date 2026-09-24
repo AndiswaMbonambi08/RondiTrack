@@ -145,3 +145,76 @@ well-formed but conflicts with something outside the payload itself, specificall
 reusing an idempotency key with a different request body. 409 Conflict is reserved
 for state conflicts on the resource itself, such as a duplicate member or a
 duplicate contribution for a cycle that's already been paid.
+
+## Demonstrated error cases
+
+### 400 Bad Request — malformed request (empty FullName)
+Request: POST /api/users
+{
+  "fullName": "",
+  "email": "test@example.com"
+}
+
+Response body:
+{
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "'Full Name' must not be empty.",
+  "correlationId": "0HNOPRRV56DRQ:00000004"
+}
+
+Screenshot: see /screenshots/400-bad-request.jpeg
+
+### 404 Not Found — nonexistent user
+Request: GET /api/users/00000000-0000-0000-0000-000000000000
+
+Response body:
+{
+  "title": "Not Found",
+  "status": 404,
+  "detail": "User not found.",
+  "correlationId": "0HNOPRRV56DRS:00000001"
+}
+
+Screenshot: see /screenshots/404-not-found.jpeg
+
+### 409 Conflict — duplicate stokvel membership
+Request: POST /api/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members
+{
+  "userId": "c31e9dff-7a92-4dd9-b469-b88eef15d677"
+}
+
+Response body:
+{
+  "title": "Conflict",
+  "status": 409,
+  "detail": "'Sipho Dlamini' is already a member of this stokvel.",
+  "correlationId": "0HNOPS7L7BLPL:00000008"
+}
+
+Screenshot: see /screenshots/409-conflict.png (captured via PowerShell against the
+live running app, since Scalar's path-parameter field would not commit this
+particular request; the response is identical either way — same running API,
+same centralized handler)
+
+All three responses come from the same centralized RondiTrackExceptionHandler,
+producing the identical problem+json shape (title, status, detail, correlationId)
+regardless of which exception type triggered them.
+
+## Correlation ID walkthrough
+Every error response includes a correlationId matching the log entry that recorded
+it. Example, from the 409 case above:
+
+Response body:
+{
+  "title": "Conflict",
+  "status": 409,
+  "detail": "'Sipho Dlamini' is already a member of this stokvel.",
+  "correlationId": "0HNOPS7L7BLPL:00000008"
+}
+
+Matching log line (from the terminal running dotnet run):
+fail: RondiTrack.ErrorHandling.RondiTrackExceptionHandler[0]
+      Request failed. CorrelationId: 0HNOPS7L7BLPL:00000008, Method: POST,
+      Path: /api/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members, StatusCode: 409
+      RondiTrack.Domain.Exceptions.ConflictException: 'Sipho Dlamini' is already a member of this stokvel.
