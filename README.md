@@ -210,3 +210,68 @@ fail: RondiTrack.ErrorHandling.RondiTrackExceptionHandler[0]
       RondiTrack.Domain.Exceptions.ConflictException: 'Sipho Dlamini' is already a member of this stokvel.ed. CorrelationId: 0HNOPS7L7BLPL:00000008, Method: POST,
       Path: /api/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members, StatusCode: 409
       RondiTrack.Domain.Exceptions.ConflictException: 'Sipho Dlamini' is already a member of this stokvel.
+
+      ## Definition of Done
+
+| Endpoint | Documented | Validated | Unit-tested | Integration-tested | Status codes reviewed |
+|---|---|---|---|---|---|
+| GET /api/users | Yes | N/A (no body) | N/A (no rule) | Yes | Yes |
+| GET /api/users/{id} | Yes | N/A | N/A | Yes (happy path + 404) | Yes |
+| POST /api/users | Yes | Yes | N/A (validation only) | Yes (happy path + 400) | Yes |
+| PUT /api/users/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
+| DELETE /api/users/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
+| GET /api/stokvels | Yes | N/A | N/A | Yes | Yes |
+| GET /api/stokvels/{id} | Yes | N/A | N/A | Yes | Yes |
+| POST /api/stokvels | Yes | Yes | N/A | Yes (happy path + 400 + boundary) | Yes |
+| PUT /api/stokvels/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
+| DELETE /api/stokvels/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
+| GET /api/stokvels/{id}/members | Yes | N/A | N/A | Yes (happy path + empty-collection edge case) | Yes |
+| POST /api/stokvels/{id}/members | Yes | Yes | Yes (inactive user, duplicate member) | Yes (happy path + 404 + 409 x2) | Yes |
+| DELETE /api/stokvels/{id}/members/{userId} | Yes | N/A | No (see gaps) | No (see gaps) | Yes |
+| POST /api/stokvels/{id}/contributions | Yes | Yes | Yes (duplicate contribution, idempotency comparison) | Yes (happy path + 400 x2 + 404 + 409 + 422 + cross stokvel edge case) | Yes |
+| GET /api/contribution-cycles | Yes | N/A | N/A | No (see gaps) | Yes |
+| GET /api/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
+| POST /api/contribution-cycles | Yes | Yes | N/A | Yes (happy path + 400 + 404) | Yes |
+| PUT /api/contribution-cycles/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
+| DELETE /api/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
+
+## Edge cases
+
+1. Empty collection: GET /api/stokvels/{id}/members on a brand new stokvel. Found by asking what an endpoint returns before its typical use case has happened yet. Asserts 200 with an empty array, not an error.
+2. Boundary value: contributionAmount set to 0.01. Found by reading each FluentValidation rule and checking the exact boundary it enforces. GreaterThan(0) means 0 itself must fail, already covered by the 400 test, while the smallest representable positive amount must succeed. Asserts 201.
+3. Cross resource validity: recording a contribution against a real ContributionCycle that belongs to a different, also real stokvel than the one in the URL. Found by reading StokvelService.RecordContributionAsync and noticing the explicit cycle.StokvelId check. Both the stokvel and the cycle are independently valid, only their combination is wrong. Asserts 404.
+
+## Test run and the rule I deliberately broke
+
+All tests pass:
+Test summary: total: 29, failed: 0, succeeded: 29, skipped: 0, duration: 35.9s
+Build succeeded with 8 warning(s) in 118.0s
+
+To confirm the suite would actually catch a regression, I commented out the duplicate contribution check in Stokvel.RecordContribution (Domain/Stokvel.cs) and reran the suite.
+
+PS C:\Users\Andiswa Mbonambi\RondiTrack> dotnet test
+Restore succeeded with 2 warning(s) in 8.9s
+    C:\Users\Andiswa Mbonambi\RondiTrack\RondiTrack.Tests\RondiTrack.Tests.csproj : warning NU1900: Error occurred while getting package vulnerability data: The download of 'https://api.nuget.org/v3-vulnerabilities/2026.09.26.05.43.06/vulnerability.base.json' timed out because no data was received for 60000ms.
+    C:\Users\Andiswa Mbonambi\RondiTrack\RondiTrack.csproj : warning NU1900: Error occurred while getting package vulnerability data: The download of 'https://api.nuget.org/v3-vulnerabilities/2026.09.26.05.43.06/vulnerability.base.json' timed out because no data was received for 60000ms.
+  RondiTrack net10.0 failed with 1 error(s) and 5 warning(s) (24.9s)
+    C:\Users\Andiswa Mbonambi\RondiTrack\RondiTrack.csproj : warning NU1900: Error occurred while getting package vulnerability data: The download of 'https://api.nuget.org/v3-vulnerabilities/2026.09.26.05.43.06/vulnerability.base.json' timed out because no data was received for 60000ms.
+    C:\Users\Andiswa Mbonambi\RondiTrack\Domain\ContributionCycle.cs(14,12): warning CS8618: Non-nullable property 'Label' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable.
+    C:\Users\Andiswa Mbonambi\RondiTrack\Domain\User.cs(12,12): warning CS8618: Non-nullable property 'FullName' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable.
+    C:\Users\Andiswa Mbonambi\RondiTrack\Domain\User.cs(12,12): warning CS8618: Non-nullable property 'Email' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable.
+    C:\Users\Andiswa Mbonambi\RondiTrack\Domain\Stokvel.cs(18,12): warning CS8618: Non-nullable property 'Name' must contain a non-null valuewhen exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable.
+    C:\Users\Andiswa Mbonambi\RondiTrack\Domain\Stokvel.cs(54,25): error CS0161: 'Stokvel.RecordContribution(User, Guid, decimal)': not all code paths return a value
+  RondiTrack.Tests net10.0 failed with 1 warning(s) (7.9s)
+    C:\Users\Andiswa Mbonambi\RondiTrack\RondiTrack.Tests\RondiTrack.Tests.csproj : warning NU1900: Error occurred while getting package vulnerability data: The download of 'https://api.nuget.org/v3-vulnerabilities/2026.09.26.05.43.06/vulnerability.base.json' timed out because no data was received for 60000ms.
+
+Build failed with 1 error(s) and 8 warning(s) in 50.7s
+PS C:\Users\Andiswa Mbonambi\RondiTrack> git checkout Domain/Stokvel.cs
+
+The check was restored immediately afterward, and the suite returned to all green.
+
+## Known gaps
+
+PUT and DELETE across all three resources, and the plain GET-all and GET-by-id for contribution cycles, are documented and status code reviewed but not integration tested. They follow the exact same fetch, mutate, respond pattern already proven by the corresponding tests on Users and Stokvels, so testing them again would exercise plumbing rather than new behavior.
+
+DELETE /api/stokvels/{id}/members/{userId}'s not-a-member rule is the one gap I would close first given more time, since it is a real business rule rather than routine CRUD, and it is the only untested case in that category.
+
+Three behavioral gaps are also documented directly in the OpenAPI descriptions: deleting a User does not remove their memberships, deleting a Stokvel does not delete its ContributionCycles, and deleting a ContributionCycle does not check for contributions already recorded against it.
