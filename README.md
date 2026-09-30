@@ -297,3 +297,52 @@ compared to what the entity classes declare — a rename can look identical to
 a drop-and-add in the generated migration, so I compared property names in
 each entity file against the CreateTable columns line by line rather than
 trusting the diff visually.
+
+## Retry configuration
+EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10)).
+5 retries capped at 10 seconds each caps total wait around 50 seconds, short
+enough that a caller isn't left hanging indefinitely, long enough to ride out
+a brief network blip or a connection pool being temporarily exhausted during
+a deploy. This retries transient failures — a dropped connection, a timeout
+reaching the database. It deliberately does not retry something like a
+constraint violation or a business-rule conflict, since retrying an inherently
+wrong request would just fail again identically; that needs to surface
+immediately as a 409, not be silently retried.
+
+## Definition of Done (extended for Assignment 5.1)
+
+| Endpoint | Documented | Validated | Unit-tested | Integration-tested | Status codes reviewed | Persisted via EF Core | Explicit transaction tested |
+|---|---|---|---|---|---|---|---|
+| GET /api/users | Yes | N/A (no body) | N/A (no rule) | Yes | Yes | No | N/A |
+| GET /api/users/{id} | Yes | N/A | N/A | Yes (happy path + 404) | Yes | No | N/A |
+| POST /api/users | Yes | Yes | N/A (validation only) | Yes (happy path + 400) | Yes | No | N/A |
+| PUT /api/users/{id} | Yes | Yes | N/A | No (see gaps) | Yes | No | N/A |
+| DELETE /api/users/{id} | Yes | N/A | N/A | No (see gaps) | Yes | No | N/A |
+| GET /api/stokvels | Yes | N/A | N/A | Yes | Yes | Yes | N/A |
+| GET /api/stokvels/{id} | Yes | N/A | N/A | Yes | Yes | Yes | N/A |
+| POST /api/stokvels | Yes | Yes | N/A | Yes (happy path + 400 + boundary) | Yes | Yes | N/A |
+| PUT /api/stokvels/{id} | Yes | Yes | N/A | No (see gaps) | Yes | Yes | N/A |
+| DELETE /api/stokvels/{id} | Yes | N/A | N/A | No (see gaps) | Yes | Yes | N/A |
+| GET /api/stokvels/{id}/members | Yes | N/A | N/A | Yes (happy path + empty-collection edge case) | Yes | Yes | N/A |
+| POST /api/stokvels/{id}/members | Yes | Yes | Yes (inactive user, duplicate member) | Yes (happy path + 404 + 409 x2) | Yes | Yes | N/A |
+| DELETE /api/stokvels/{id}/members/{userId} | Yes | N/A | No (see gaps) | No (see gaps) | Yes | Yes | N/A |
+| POST /api/stokvels/{id}/contributions | Yes | Yes | Yes (duplicate contribution, idempotency comparison) | Yes (happy path + 400 x2 + 404 + 409 + 422 + cross stokvel edge case) | Yes | No (see gaps) | N/A |
+| GET /api/contribution-cycles | Yes | N/A | N/A | No (see gaps) | Yes | Yes | N/A |
+| GET /api/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes | Yes | N/A |
+| POST /api/contribution-cycles | Yes | Yes | N/A | Yes (happy path + 400 + 404) | Yes | Yes | N/A |
+| PUT /api/contribution-cycles/{id} | Yes | Yes | N/A | No (see gaps) | Yes | Yes | N/A |
+| DELETE /api/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes | Yes | N/A |
+| POST /api/stokvels/{stokvelId}/cycles/{cycleId}/payout | Yes | N/A (no user-supplied body) | No (see gaps) | Yes (rollback test) | Yes | Yes | Yes |
+
+## Note on Contribution persistence
+
+Contribution itself is not yet backed by a dedicated EF table today. It's created
+and read as part of Stokvel's in-memory contribution list, the same as before
+this assignment. Persisting it properly means either its own DbSet and
+repository, or folding it into the same reconciliation approach used for
+StokvelMember in SaveChangesMiddleware. Both are reasonable, but doing either
+well needs more room than today's scope allows without the payout
+transaction work suffering for it. This is a stated gap, not an oversight:
+Contribution stays in-memory for now, and Users stays in-memory as a
+deliberate choice since it carries no cross-entity decision worth protecting
+with a database swap yet.
