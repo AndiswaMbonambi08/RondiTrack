@@ -2,10 +2,21 @@
 // the period (e.g. "2026-09"). No cross-entity decision is needed to create or update
 // one, so this entity is handled straight from the endpoint via its repository, with
 // no service layer. Only validates its own shape, same as User and Stokvel.
+using RondiTrack.Domain.Exceptions;
 namespace RondiTrack.Domain;
+
+// A cycle starts Open. Once a payout has been processed for it, it's closed
+// off so it can't be paid out twice.
+public enum CycleStatus
+{
+    Open,
+    PayoutProcessed
+}
 
 public class ContributionCycle
 {
+    public CycleStatus Status { get; private set; } = CycleStatus.Open;
+
     public Guid Id { get; }
     public Guid StokvelId { get; }
     public string Label { get; private set; }
@@ -23,6 +34,15 @@ public class ContributionCycle
     {
         SetLabel(label);
         SetTargetAmount(targetAmount);
+    }
+
+    // Called once, during payout processing, inside the transaction below.
+    // Refuses to run twice so the same cycle can't be paid out more than once.
+    public void MarkPayoutProcessed()
+    {
+        if (Status == CycleStatus.PayoutProcessed)
+            throw new ConflictException("This cycle's payout has already been processed.");
+        Status = CycleStatus.PayoutProcessed;
     }
 
     private void SetLabel(string label)
