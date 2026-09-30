@@ -275,3 +275,14 @@ PUT and DELETE across all three resources, and the plain GET-all and GET-by-id f
 DELETE /api/stokvels/{id}/members/{userId}'s not-a-member rule is the one gap I would close first given more time, since it is a real business rule rather than routine CRUD, and it is the only untested case in that category.
 
 Three behavioral gaps are also documented directly in the OpenAPI descriptions: deleting a User does not remove their memberships, deleting a Stokvel does not delete its ContributionCycles, and deleting a ContributionCycle does not check for contributions already recorded against it.
+
+## Secret management
+The PostgreSQL connection string is stored via .NET User Secrets, never in
+appsettings.json or any tracked file. A teammate cloning this repo runs:
+
+dotnet user-secrets init
+dotnet user-secrets set "ConnectionStrings:RondiTrack" "Host=localhost;Port=5432;Database=ronditrack;Username=ronditrack_user;Password=<their-own-password>"
+
+then their own local secrets.json (outside the repo) holds it. Program.cs reads
+it through normal configuration, which merges User Secrets automatically in
+the Development environment.
