@@ -286,3 +286,14 @@ dotnet user-secrets set "ConnectionStrings:RondiTrack" "Host=localhost;Port=5432
 then their own local secrets.json (outside the repo) holds it. Program.cs reads
 it through normal configuration, which merges User Secrets automatically in
 the Development environment.
+
+## Migration review
+Ran `dotnet ef migrations add InitialCreate`, then read the generated file
+before applying it. Checked specifically that: each of the six tables was
+created (Users, Stokvels, StokvelMembers, ContributionCycles, Contributions,
+Payouts), StokvelMembers has a composite key on (StokvelId, UserId) rather
+than its own surrogate id, and no column was silently dropped or renamed
+compared to what the entity classes declare — a rename can look identical to
+a drop-and-add in the generated migration, so I compared property names in
+each entity file against the CreateTable columns line by line rather than
+trusting the diff visually.
