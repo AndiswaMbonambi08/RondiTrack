@@ -75,4 +75,14 @@ public class Stokvel
             throw new ArgumentException("Contribution amount must be greater than zero.", nameof(amount));
         ContributionAmount = amount;
     }
+
+    // Only the EF repository calls this, after loading a Stokvel's membership
+    // rows from the database. It rebuilds the in-memory list. Nothing else in
+    // the app can call it, since it's internal — AddMember/RemoveMember are
+    // still the only public way to change membership.
+    internal void LoadMembers(IEnumerable<Guid> memberIds)
+    {
+        _memberIds.Clear();
+        _memberIds.AddRange(memberIds);
+    }
 }
