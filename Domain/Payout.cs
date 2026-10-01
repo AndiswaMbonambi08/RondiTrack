@@ -5,12 +5,16 @@ namespace RondiTrack.Domain;
 
 public class Payout
 {
-    public Guid Id { get; }
-    public Guid StokvelId { get; }
-    public Guid ContributionCycleId { get; }
-    public Guid RecipientUserId { get; }
-    public decimal Amount { get; }
-    public DateTime PayoutDate { get; }
+    public Guid StokvelId { get; private set; }
+    public Guid ContributionCycleId { get; private set; }
+    public Guid RecipientUserId { get; private set; }
+    public decimal Amount { get; private set; }
+    public DateTime PayoutDate { get; private set; }
+
+    // EF Core needs a constructor it can call without arguments when loading
+    // rows back from the database. The public constructor below stays the
+    // only way application code creates a Payout.
+    private Payout() { }
 
     public Payout(Guid stokvelId, Guid contributionCycleId, Guid recipientUserId, decimal amount)
     {

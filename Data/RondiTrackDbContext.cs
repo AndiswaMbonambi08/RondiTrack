@@ -37,7 +37,14 @@ public class RondiTrackDbContext : DbContext
         });
 
         modelBuilder.Entity<ContributionCycle>(b => b.HasKey(c => c.Id));
-        modelBuilder.Entity<Contribution>(b => b.HasKey(c => c.Id));
+
+        modelBuilder.Entity<Contribution>(b =>
+        {
+            b.HasKey(c => c.Id);
+            // EF uses Contribution's private parameterless constructor to
+            // materialize rows back from the database.
+        });
+
         modelBuilder.Entity<Payout>(b => b.HasKey(p => p.Id));
     }
 }

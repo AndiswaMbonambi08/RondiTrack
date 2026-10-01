@@ -4,11 +4,16 @@ namespace RondiTrack.Domain;
 
 public class Contribution
 {
-    public Guid Id { get; }
-    public Guid UserId { get; }
-    public Guid ContributionCycleId { get; }
-    public decimal Amount { get; }
-    public DateTime RecordedAt { get; }
+    public Guid UserId { get; private set; }
+    public Guid ContributionCycleId { get; private set; }
+    public decimal Amount { get; private set; }
+    public DateTime RecordedAt { get; private set; }
+
+    // EF Core needs a constructor it can call without arguments when loading
+    // rows back from the database. The public constructor above stays the
+    // only way application code creates a Contribution; this one is only
+    // ever used by EF's internal materialization.
+    private Contribution() { }
 
     public Contribution(Guid userId, Guid contributionCycleId, decimal amount)
     {

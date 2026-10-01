@@ -22,6 +22,11 @@ public class ContributionCycle
     public string Label { get; private set; }
     public decimal TargetAmount { get; private set; }
 
+    // EF Core needs a constructor it can call without arguments when loading
+    // rows back from the database. The public constructor below stays the
+    // only way application code creates a ContributionCycle.
+    private ContributionCycle() { }
+
     public ContributionCycle(Guid stokvelId, string label, decimal targetAmount)
     {
         Id = Guid.NewGuid();
