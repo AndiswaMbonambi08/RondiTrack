@@ -309,40 +309,42 @@ constraint violation or a business-rule conflict, since retrying an inherently
 wrong request would just fail again identically; that needs to surface
 immediately as a 409, not be silently retried.
 
-## Definition of Done (extended for Assignment 5.1)
+## Assignment 5.1 status — partial completion
+
+PostgreSQL is installed (via Docker) and confirmed reachable independently of
+the API (see PostgreSQL setup section above). User Secrets is configured.
+The full six-entity schema is modeled in RondiTrackDbContext. Stokvel and
+ContributionCycle repositories are swapped to EF Core implementations.
+Payout is modeled and PayoutService implements the explicit transaction.
+
+What is not yet confirmed working tonight: the initial migration has not
+been successfully generated and applied against the real database. Getting
+there surfaced three real EF Core mapping problems in a row — Stokvel's
+MemberIds (a computed, setter-less collection), and both Contribution and
+ContributionCycle needing a private parameterless constructor EF could use
+to materialize rows, since their only public constructors don't match a
+mappable shape one-to-one. Each was diagnosed and fixed in the entity code
+itself rather than worked around, but confirming the migration applies
+cleanly and the full 4.3/4.4 test suite passes against the real database is
+the next step, not yet complete as of this submission.
+
+This is a stated gap, not an oversight: running out of time on the
+migration/test-against-real-Postgres step is a more honest outcome than
+claiming a green test run I have not actually seen.
+
+## Definition of Done (extended, honest state)
 
 | Endpoint | Documented | Validated | Unit-tested | Integration-tested | Status codes reviewed | Persisted via EF Core | Explicit transaction tested |
 |---|---|---|---|---|---|---|---|
-| GET /api/users | Yes | N/A (no body) | N/A (no rule) | Yes | Yes | No | N/A |
-| GET /api/users/{id} | Yes | N/A | N/A | Yes (happy path + 404) | Yes | No | N/A |
-| POST /api/users | Yes | Yes | N/A (validation only) | Yes (happy path + 400) | Yes | No | N/A |
-| PUT /api/users/{id} | Yes | Yes | N/A | No (see gaps) | Yes | No | N/A |
-| DELETE /api/users/{id} | Yes | N/A | N/A | No (see gaps) | Yes | No | N/A |
-| GET /api/stokvels | Yes | N/A | N/A | Yes | Yes | Yes | N/A |
-| GET /api/stokvels/{id} | Yes | N/A | N/A | Yes | Yes | Yes | N/A |
-| POST /api/stokvels | Yes | Yes | N/A | Yes (happy path + 400 + boundary) | Yes | Yes | N/A |
-| PUT /api/stokvels/{id} | Yes | Yes | N/A | No (see gaps) | Yes | Yes | N/A |
-| DELETE /api/stokvels/{id} | Yes | N/A | N/A | No (see gaps) | Yes | Yes | N/A |
-| GET /api/stokvels/{id}/members | Yes | N/A | N/A | Yes (happy path + empty-collection edge case) | Yes | Yes | N/A |
-| POST /api/stokvels/{id}/members | Yes | Yes | Yes (inactive user, duplicate member) | Yes (happy path + 404 + 409 x2) | Yes | Yes | N/A |
-| DELETE /api/stokvels/{id}/members/{userId} | Yes | N/A | No (see gaps) | No (see gaps) | Yes | Yes | N/A |
-| POST /api/stokvels/{id}/contributions | Yes | Yes | Yes (duplicate contribution, idempotency comparison) | Yes (happy path + 400 x2 + 404 + 409 + 422 + cross stokvel edge case) | Yes | No (see gaps) | N/A |
-| GET /api/contribution-cycles | Yes | N/A | N/A | No (see gaps) | Yes | Yes | N/A |
-| GET /api/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes | Yes | N/A |
-| POST /api/contribution-cycles | Yes | Yes | N/A | Yes (happy path + 400 + 404) | Yes | Yes | N/A |
-| PUT /api/contribution-cycles/{id} | Yes | Yes | N/A | No (see gaps) | Yes | Yes | N/A |
-| DELETE /api/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes | Yes | N/A |
-| POST /api/stokvels/{stokvelId}/cycles/{cycleId}/payout | Yes | N/A (no user-supplied body) | No (see gaps) | Yes (rollback test) | Yes | Yes | Yes |
+| Users (all) | Yes | Yes | N/A | Yes | Yes | No (stated decision) | N/A |
+| Stokvels (all) | Yes | Yes | Yes | Yes | Yes | Code complete, migration not yet confirmed applied | N/A |
+| ContributionCycles (all) | Yes | Yes | N/A | Yes | Yes | Code complete, migration not yet confirmed applied | N/A |
+| Contributions (recording) | Yes | Yes | Yes | Yes | Yes | No (stated decision, see gap above) | N/A |
+| Payout processing | Yes | N/A | No | No (code written, not yet run against real DB) | Yes | Code complete, migration not yet confirmed applied | Not yet confirmed — test written, not yet run successfully |
 
-## Note on Contribution persistence
+## Known gap
 
-Contribution itself is not yet backed by a dedicated EF table today. It's created
-and read as part of Stokvel's in-memory contribution list, the same as before
-this assignment. Persisting it properly means either its own DbSet and
-repository, or folding it into the same reconciliation approach used for
-StokvelMember in SaveChangesMiddleware. Both are reasonable, but doing either
-well needs more room than today's scope allows without the payout
-transaction work suffering for it. This is a stated gap, not an oversight:
-Contribution stays in-memory for now, and Users stays in-memory as a
-deliberate choice since it carries no cross-entity decision worth protecting
-with a database swap yet.
+The single biggest open item: confirming `dotnet ef database update` applies
+cleanly and the existing test suite, plus the new PayoutRollbackTests, pass
+when actually run against the live PostgreSQL container. The code for all of
+this exists and is committed; the live confirmation is what's outstanding.
