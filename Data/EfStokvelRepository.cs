@@ -14,17 +14,21 @@ public class EfStokvelRepository : IStokvelRepository
         _db = db;
     }
 
-    public async Task<IReadOnlyList<Stokvel>> GetAllAsync()
+    public async Task<IReadOnlyList<Stokvel>> GetAllAsync(bool asNoTracking = false)
     {
-        var stokvels = await _db.Stokvels.ToListAsync();
+        var query = _db.Stokvels.AsQueryable();
+        if (asNoTracking) query = query.AsNoTracking();
+        var stokvels = await query.ToListAsync();
         foreach (var stokvel in stokvels)
             await LoadMembersAsync(stokvel);
         return stokvels;
     }
 
-    public async Task<Stokvel?> GetByIdAsync(Guid id)
+    public async Task<Stokvel?> GetByIdAsync(Guid id, bool asNoTracking = false)
     {
-        var stokvel = await _db.Stokvels.FirstOrDefaultAsync(s => s.Id == id);
+        var query = _db.Stokvels.AsQueryable();
+        if (asNoTracking) query = query.AsNoTracking();
+        var stokvel = await query.FirstOrDefaultAsync(s => s.Id == id);
         if (stokvel is not null)
             await LoadMembersAsync(stokvel);
         return stokvel;

@@ -5,8 +5,8 @@ namespace RondiTrack.Data;
 
 public interface IStokvelRepository
 {
-    Task<IReadOnlyList<Stokvel>> GetAllAsync();
-    Task<Stokvel?> GetByIdAsync(Guid id);
+    Task<IReadOnlyList<Stokvel>> GetAllAsync(bool asNoTracking = false);
+    Task<Stokvel?> GetByIdAsync(Guid id, bool asNoTracking = false);
     Task AddAsync(Stokvel stokvel);
     Task DeleteAsync(Guid id);
 }
