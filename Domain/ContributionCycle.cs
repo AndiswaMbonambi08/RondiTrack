@@ -15,6 +15,7 @@ public enum CycleStatus
 
 public class ContributionCycle
 {
+    public ICollection<Contribution> Contributions { get; private set; } = new List<Contribution>();
     public CycleStatus Status { get; private set; } = CycleStatus.Open;
 
     public Guid Id { get; }
