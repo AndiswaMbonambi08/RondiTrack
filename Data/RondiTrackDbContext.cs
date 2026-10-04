@@ -24,25 +24,48 @@ public class RondiTrackDbContext : DbContext
         modelBuilder.Entity<Stokvel>(b =>
         {
             b.HasKey(s => s.Id);
-            // This is the property that wouldn't map cleanly. It's a computed,
-            // read-only wrapper over a private field with no public setter, so
-            // EF has no way to write to it. We tell EF to skip it entirely and
-            // use the StokvelMember table as the real source of truth instead.
             b.Ignore(s => s.MemberIds);
         });
 
         modelBuilder.Entity<StokvelMember>(b =>
         {
+            // The composite primary key itself — the direct answer to
+            // "configure a composite primary key via the Fluent API."
             b.HasKey(sm => new { sm.StokvelId, sm.UserId });
+
+            b.HasOne(sm => sm.User)
+                .WithMany()
+                .HasForeignKey(sm => sm.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(sm => sm.Stokvel)
+                .WithMany()
+                .HasForeignKey(sm => sm.StokvelId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<ContributionCycle>(b => b.HasKey(c => c.Id));
+        modelBuilder.Entity<ContributionCycle>(b =>
+        {
+            b.HasKey(c => c.Id);
+        });
 
         modelBuilder.Entity<Contribution>(b =>
         {
             b.HasKey(c => c.Id);
-            // EF uses Contribution's private parameterless constructor to
-            // materialize rows back from the database.
+
+            // The composite FK answering the "how does Contribution reference
+            // a specific membership" question from Phase 3 — points at
+            // StokvelMember's composite key using the same two columns.
+            b.HasOne(c => c.Member)
+                .WithMany(sm => sm.Contributions)
+                .HasForeignKey(c => new { c.StokvelId, c.UserId })
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // The one-to-many from Phase 4.
+            b.HasOne(c => c.ContributionCycle)
+                .WithMany(cc => cc.Contributions)
+                .HasForeignKey(c => c.ContributionCycleId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Payout>(b => b.HasKey(p => p.Id));
