@@ -57,7 +57,7 @@ public class Stokvel
         if (_contributions.Any(c => c.UserId == user.Id && c.ContributionCycleId == contributionCycleId))
             throw new ConflictException($"'{user.FullName}' has already recorded a contribution for this cycle.");
 
-        var contribution = new Contribution(user.Id, contributionCycleId, amount);
+        var contribution = new Contribution(Id, user.Id, contributionCycleId, amount);
         _contributions.Add(contribution);
         return contribution;
     }

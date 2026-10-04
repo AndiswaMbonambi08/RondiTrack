@@ -63,7 +63,7 @@ public class StokvelService : IStokvelService
             throw new NotFoundException("That contribution cycle does not belong to this stokvel.");
 
         var contribution = stokvel.RecordContribution(user, cycle.Id, request.Amount);
-        var response = contribution.ToResponse(stokvelId);
+        var response = contribution.ToResponse();
 
         await _idempotencyStore.SaveAsync(idempotencyKey, new IdempotencyRecord(request, response));
 
