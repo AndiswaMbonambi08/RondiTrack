@@ -348,3 +348,109 @@ The single biggest open item: confirming `dotnet ef database update` applies
 cleanly and the existing test suite, plus the new PayoutRollbackTests, pass
 when actually run against the live PostgreSQL container. The code for all of
 this exists and is committed; the live confirmation is what's outstanding.
+
+## StokvelMember's composite key (Assignment 5.2)
+StokvelMember carries real data of its own now — Role and JoinedAtUtc — so it
+gets a composite primary key on (StokvelId, UserId) rather than a surrogate
+Guid Id. Nobody looks this row up by an arbitrary id; they look it up by "this
+user's membership in this stokvel," which the pair already expresses
+completely. A surrogate id would be an extra column with no real meaning.
+
+Contribution needed a way to reference a specific membership. We gave it its
+own StokvelId column alongside UserId, forming a real composite FK to
+StokvelMember. The alternative, resolving the stokvel only indirectly through
+ContributionCycle.StokvelId, was rejected: every query needing "which
+membership made this" would need an extra join, and there would be no actual
+foreign-key constraint protecting the relationship, only convention.
+
+## Replacing generic repository access
+Assignment 5.1's implementation never routed StokvelMember through the
+generic IRepository<T> pattern at all — a composite key made
+GetByIdAsync(Guid) meaningless the moment the join table existed, so access
+was always raw DbContext queries inside EfStokvelRepository. Today that's
+formalized into IStokvelMemberRepository, with a composite-key-aware
+GetAsync(stokvelId, userId) and GetByStokvelIdAsync(stokvelId), used wherever
+code needs one specific membership directly.
+
+## Migration review — reading an ALTER, not a CREATE
+This migration renames StokvelMembers.JoinedAt to JoinedAtUtc. The generator's
+default output was a DropColumn + AddColumn pair, which would silently
+discard every existing value in that column. I replaced it with
+migrationBuilder.RenameColumn(...) instead, preserving the data. I also
+checked the new foreign key constraints on Contributions (StokvelId+UserId →
+StokvelMembers, ContributionCycleId → ContributionCycles) to confirm neither
+table was being dropped and recreated.
+
+## Second relationship: ContributionCycle to Contribution
+Wired ContributionCycle ↔ Contribution rather than Stokvel ↔ ContributionCycle,
+since the N+1 endpoint needed this exact relationship to load Contributions
+for a cycle. Stokvel ↔ ContributionCycle was a fair alternative but nothing
+yet actually queries through it.
+
+## N+1 measurement
+Naive endpoint (GET /api/stokvels/{stokvelId}/cycles/{cycleId}/contributions),
+tested with [N] contributions in a cycle, fired [PASTE YOUR REAL COUNT HERE]
+queries: 1 to load the contributions, then one StokvelMember lookup and one
+User lookup per row.
+
+## The two fixes, and which shipped
+Eager loading (Include/ThenInclude) brings the whole graph back in one query,
+but pulls every mapped column of Contribution, StokvelMember, and User, even
+though the response only needs UserFullName from User. Projection (Select)
+also runs one query but selects only the five columns the response actually
+returns. Shipped projection: at 5 members the difference is small, but at 50
+members returning every contribution in a cycle, eager loading would
+materialize 50 full User and StokvelMember rows for data the response
+discards immediately. Projection scales with what's returned, not with the
+full object graph.
+
+## Loading strategy, named as a decision
+The new contributions endpoint uses projection, chosen above, for
+performance. GET /api/stokvels/{id} uses explicit, hand-written loading
+(LoadMembersAsync queries StokvelMembers separately) rather than Include,
+because MemberIds is Ignore()'d entirely in the DbContext (a decision made in
+5.1), so Include was never an option for it. Lazy loading appears nowhere in
+RondiTrack: no proxies package is installed, and no UseLazyLoadingProxies()
+call exists. Without it, every navigation stays null until explicitly loaded,
+which is exactly why the naive N+1 demo had to manually re-query in a loop —
+a more realistic cause of N+1 in a non-proxy EF codebase than accidental
+lazy-loading triggers.
+
+## AsNoTracking audit
+GetByIdAsync and GetAllAsync on both IStokvelRepository and
+IContributionCycleRepository are shared between pure GET endpoints and
+mutation paths (PUT, AddMember, RecordContribution, payout processing).
+Applying AsNoTracking() blindly to either method would have silently broken
+every write: an untracked entity's in-memory mutation would never be seen by
+SaveChangesAsync. Fixed with an optional asNoTracking parameter, defaulting
+to false so every existing caller's behavior is unchanged; only the plain GET
+endpoints pass asNoTracking: true explicitly.
+
+## Test suite, before and after
+[will paste my output, once tested]
+
+Nothing in the existing test suite called `new Contribution(...)` directly or
+read StokvelMember.Id — StokvelUnitTests and StokvelServiceUnitTests only
+ever go through Stokvel.RecordContribution and StokvelService's public
+methods, both of which kept their exact signatures. The one real ripple from
+giving Contribution a StokvelId was internal: Stokvel.RecordContribution's
+constructor call and ContributionMapping.ToResponse() both needed updating,
+neither is exercised directly by any test, which is why the suite stayed
+green without changes.
+
+## Definition of Done, extended again
+
+| Area | Relationship modeled as real navigation | N+1 measured and fixed |
+|---|---|---|
+| StokvelMember ↔ User/Stokvel | Yes | N/A |
+| Contribution ↔ StokvelMember | Yes | N/A |
+| ContributionCycle ↔ Contribution | Yes | Yes (see above) |
+| Stokvel ↔ ContributionCycle | No (stated decision, not wired) | N/A |
+
+## Known gap
+Stokvel ↔ ContributionCycle stays a bare Guid FK, not a real navigation —
+nothing yet queries through it, so wiring it added no proven value today.
+Payout's StokvelId + RecipientUserId could similarly become a composite FK to
+StokvelMember, following the exact same pattern as Contribution, but doing so
+wasn't required by anything built today and was left as a stated gap rather
+than extra scope.
