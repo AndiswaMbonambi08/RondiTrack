@@ -36,12 +36,9 @@ public class SaveChangesMiddleware
             {
                 if (!existingMemberIds.Contains(memberId))
                 {
-                    db.StokvelMembers.Add(new StokvelMember
-                    {
-                        StokvelId = stokvel.Id,
-                        UserId = memberId,
-                        JoinedAt = DateTime.UtcNow
-                    });
+                    db.StokvelMembers.Add(new RondiTrack.Persistence.Entities.StokvelMember(
+                    stokvel.Id, memberId, RondiTrack.Persistence.Entities.StokvelMemberRole.Member, DateTime.UtcNow));
+                       
                 }
             }
 

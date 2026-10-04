@@ -76,12 +76,9 @@ using (var scope = app.Services.CreateScope())
     // never fires for it — save the membership rows directly here instead.
     foreach (var memberId in stokvel.MemberIds)
     {
-        db.StokvelMembers.Add(new RondiTrack.Persistence.Entities.StokvelMember
-        {
-            StokvelId = stokvel.Id,
-            UserId = memberId,
-            JoinedAt = DateTime.UtcNow
-        });
+       db.StokvelMembers.Add(new RondiTrack.Persistence.Entities.StokvelMember(
+       stokvel.Id, memberId, RondiTrack.Persistence.Entities.StokvelMemberRole.Member, DateTime.UtcNow));
+        
     }
     await db.SaveChangesAsync();
 }
