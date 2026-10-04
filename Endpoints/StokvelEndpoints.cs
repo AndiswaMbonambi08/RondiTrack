@@ -159,7 +159,7 @@ public static class StokvelEndpoints
         .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
         .AddEndpointFilter<ValidationFilter<RecordContributionRequest>>();
 
-                   group.MapGet("/{stokvelId:guid}/cycles/{cycleId:guid}/contributions", async (
+            group.MapGet("/{stokvelId:guid}/cycles/{cycleId:guid}/contributions", async (
             Guid stokvelId, Guid cycleId, RondiTrackDbContext db) =>
         {
             // NOT SHIPPED — eager loading, for comparison. One query (with
@@ -196,4 +196,5 @@ public static class StokvelEndpoints
         .WithSummary("List a cycle's contributions with contributor names")
         .WithDescription("Uses a projection query — fetches only the columns this response returns, not the full entity graph.")
         .Produces<IEnumerable<ContributionDetailResponse>>(StatusCodes.Status200OK);
+    }
 }
