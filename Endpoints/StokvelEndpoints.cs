@@ -159,30 +159,41 @@ public static class StokvelEndpoints
         .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
         .AddEndpointFilter<ValidationFilter<RecordContributionRequest>>();
 
-            group.MapGet("/{stokvelId:guid}/cycles/{cycleId:guid}/contributions", async (
+                   group.MapGet("/{stokvelId:guid}/cycles/{cycleId:guid}/contributions", async (
             Guid stokvelId, Guid cycleId, RondiTrackDbContext db) =>
         {
-            // Deliberately naive. Without lazy-loading proxies installed, the
-            // realistic way a developer introduces N+1 here is exactly this:
-            // load the contributions, then loop and fetch each contributor's
-            // membership and user in a separate round trip per row.
-            var contributions = await db.Contributions
+            // NOT SHIPPED — eager loading, for comparison. One query (with
+            // joins), but pulls every mapped column of Contribution,
+            // StokvelMember, and User even though the response only needs
+            // UserFullName out of all of that.
+            //
+            // var eager = await db.Contributions
+            //     .Where(c => c.StokvelId == stokvelId && c.ContributionCycleId == cycleId)
+            //     .Include(c => c.Member).ThenInclude(m => m!.User)
+            //     .AsNoTracking()
+            //     .ToListAsync();
+
+            // SHIPPED — projection. Also one query, but selects only the five
+            // columns the response actually returns. At 5 members the
+            // difference is a handful of wasted columns; at 50 members
+            // returning every contribution in a cycle, eager loading would
+            // materialize 50 full User rows (email, isActive, everything)
+            // and 50 full StokvelMember rows (role, joinedAtUtc) that the
+            // response throws away immediately. Projection scales with what's
+            // actually returned, not with the full object graph.
+            var results = await db.Contributions
                 .Where(c => c.StokvelId == stokvelId && c.ContributionCycleId == cycleId)
+                .Select(c => new ContributionDetailResponse(
+                    c.Id,
+                    c.UserId,
+                    c.Member!.User!.FullName,
+                    c.Amount,
+                    c.RecordedAt))
                 .ToListAsync();
-
-            var results = new List<ContributionDetailResponse>();
-            foreach (var contribution in contributions)
-            {
-                var member = await db.StokvelMembers
-                    .FirstOrDefaultAsync(sm => sm.StokvelId == stokvelId && sm.UserId == contribution.UserId);
-                var user = member is null ? null : await db.Users.FindAsync(contribution.UserId);
-
-                results.Add(new ContributionDetailResponse(
-                    contribution.Id, contribution.UserId, user?.FullName ?? "Unknown", contribution.Amount, contribution.RecordedAt));
-            }
 
             return Results.Ok(results);
         })
-        .WithSummary("List a cycle's contributions with contributor names (naive version, kept for comparison)");
-    }
+        .WithSummary("List a cycle's contributions with contributor names")
+        .WithDescription("Uses a projection query — fetches only the columns this response returns, not the full entity graph.")
+        .Produces<IEnumerable<ContributionDetailResponse>>(StatusCodes.Status200OK);
 }
