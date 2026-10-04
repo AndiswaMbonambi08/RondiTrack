@@ -31,6 +31,7 @@ builder.Services.AddScoped<IStokvelRepository, EfStokvelRepository>();
 builder.Services.AddScoped<IContributionCycleRepository, EfContributionCycleRepository>();
 builder.Services.AddScoped<IPayoutRepository, EfPayoutRepository>();
 builder.Services.AddScoped<IPayoutService, PayoutService>();
+builder.Services.AddScoped<IStokvelMemberRepository, EfStokvelMemberRepository>();
 
 // Not swapped yet — a stated decision, not an oversight. See README.
 builder.Services.AddSingleton<IUserRepository, InMemoryUserRepository>();
