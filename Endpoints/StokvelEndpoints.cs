@@ -8,6 +8,8 @@ using RondiTrack.Dtos;
 using RondiTrack.Mapping;
 using RondiTrack.Services;
 using RondiTrack.Validation;
+using Microsoft.EntityFrameworkCore;
+
 
 namespace RondiTrack.Endpoints;
 
@@ -156,5 +158,31 @@ public static class StokvelEndpoints
         .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
         .AddEndpointFilter<ValidationFilter<RecordContributionRequest>>();
+
+            group.MapGet("/{stokvelId:guid}/cycles/{cycleId:guid}/contributions", async (
+            Guid stokvelId, Guid cycleId, RondiTrackDbContext db) =>
+        {
+            // Deliberately naive. Without lazy-loading proxies installed, the
+            // realistic way a developer introduces N+1 here is exactly this:
+            // load the contributions, then loop and fetch each contributor's
+            // membership and user in a separate round trip per row.
+            var contributions = await db.Contributions
+                .Where(c => c.StokvelId == stokvelId && c.ContributionCycleId == cycleId)
+                .ToListAsync();
+
+            var results = new List<ContributionDetailResponse>();
+            foreach (var contribution in contributions)
+            {
+                var member = await db.StokvelMembers
+                    .FirstOrDefaultAsync(sm => sm.StokvelId == stokvelId && sm.UserId == contribution.UserId);
+                var user = member is null ? null : await db.Users.FindAsync(contribution.UserId);
+
+                results.Add(new ContributionDetailResponse(
+                    contribution.Id, contribution.UserId, user?.FullName ?? "Unknown", contribution.Amount, contribution.RecordedAt));
+            }
+
+            return Results.Ok(results);
+        })
+        .WithSummary("List a cycle's contributions with contributor names (naive version, kept for comparison)");
     }
 }
