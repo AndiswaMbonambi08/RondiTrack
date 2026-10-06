@@ -454,3 +454,207 @@ Payout's StokvelId + RecipientUserId could similarly become a composite FK to
 StokvelMember, following the exact same pattern as Contribution, but doing so
 wasn't required by anything built today and was left as a stated gap rather
 than extra scope.
+
+# Assignment 5.3 — Database Integrity, Query Behaviour and Definition of Done
+
+## Audit results
+
+| Area                    | Result / evidence                                                                                                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read-query audit        | Read endpoints were audited for materialising collections before filtering/paging. The audit was recorded in `docs/audit-raw.txt`.                                                                                    |
+| Projection query        | `GET /api/stokvels/{stokvelId}/cycles/{cycleId}/contributions` uses a projection rather than eager-loading the complete `Contribution -> StokvelMember -> User` graph.                                                |
+| Pagination              | Pagination contract added for contributions/members, including page size, continuation token, sorting and filter allow-lists.                                                                                         |
+| Composite index         | Added migration `20261006062004_AddContributionPagingIndex`.                                                                                                                                                          |
+| Duplicate contributions | `SELECT "ContributionCycleId", "UserId", COUNT(*) FROM "Contributions" GROUP BY 1,2 HAVING COUNT(*) > 1;` returned **0 rows**.                                                                                        |
+| Duplicate payouts       | `SELECT "StokvelId", "ContributionCycleId", COUNT(*) FROM "Payouts" GROUP BY 1,2 HAVING COUNT(*) > 1;` returned **0 rows**.                                                                                           |
+| Test stokvel volume     | At one audit point there were **26** `Test Stokvel` rows, of which **20** had members.                                                                                                                                |
+| Users                   | `SELECT COUNT(*) AS users FROM "Users";` returned **51** users.                                                                                                                                                       |
+| Seed behaviour          | The startup seed creates a stokvel on every application start, and the integration tests share the development database.                                                                                              |
+| User/EF boundary        | Users still live in memory. `MirroringUserRepository` writes a corresponding row to `Users` so `StokvelMembers.UserId` satisfies the database foreign key. The clean long-term fix is to move users fully to EF Core. |
+
+## Logged SQL
+
+The following SQL was captured during the audit:
+
+```sql
+SELECT "ContributionCycleId", "UserId", COUNT(*)
+FROM "Contributions"
+GROUP BY 1,2
+HAVING COUNT(*) > 1;
+```
+
+Result:
+
+```text
+(0 rows)
+```
+
+```sql
+SELECT "StokvelId", "ContributionCycleId", COUNT(*)
+FROM "Payouts"
+GROUP BY 1,2
+HAVING COUNT(*) > 1;
+```
+
+Result:
+
+```text
+(0 rows)
+```
+
+The stokvel/member-volume query was also run:
+
+```sql
+SELECT s."Id",
+       s."Name",
+       (SELECT COUNT(*)
+        FROM "StokvelMembers" m
+        WHERE m."StokvelId" = s."Id") AS members
+FROM "Stokvels" s
+ORDER BY members;
+```
+
+At that point the database contained **25 stokvel rows**. The result included 26 `Test Stokvel` rows in a later count because the development database was being shared and accumulating test data.
+
+## Query plans
+
+The intended comparison was between the contribution paging query before and after the composite index.
+
+The migration added the contribution paging index:
+
+```text
+20261006062004_AddContributionPagingIndex
+```
+
+However, the actual EXPLAIN output was **not successfully captured** in the supplied run. The commands attempted to read:
+
+```powershell
+Get-Content docs\query.sql -Raw |
+    docker exec -i ronditrack-postgres psql -U ronditrack_user -d ronditrack_perf |
+    Tee-Object docs\plan-before.txt
+
+Get-Content docs\query.sql -Raw |
+    docker exec -i ronditrack-postgres psql -U ronditrack_user -d ronditrack_perf |
+    Tee-Object docs\plan-after.txt
+```
+
+but `docs\query.sql` did not exist. Therefore no real before/after EXPLAIN numbers are recorded here rather than inventing them.
+
+## Migration checks
+
+The performance database initially had no relations and migration application initially failed because the model had pending changes.
+
+The database was subsequently updated successfully. The migrations applied included:
+
+```text
+20261005195215_AddStokvelMemberRoleAndRelationships
+20261006062004_AddContributionPagingIndex
+```
+
+The final migration check reported:
+
+```text
+No migrations were applied. The database is already up to date.
+```
+
+The migration added the `ContributionCycles.StokvelId` column and the required relationship/index changes.
+
+## Test before
+
+The baseline suite contained **30 tests**:
+
+```text
+Failed: 3
+Passed: 27
+Skipped: 0
+Total: 30
+```
+
+The three failing tests were:
+
+1. `IdempotencyIntegrationTests.SameIdempotencyKeyDifferentAmount_Returns422ProblemJson`
+
+   * Expected `422 UnprocessableEntity`
+   * Actual `404 NotFound`
+
+2. `ContributionCycleAndContributionTests.RecordContribution_ValidMemberAndCycle_Returns201`
+
+   * Expected `201 Created`
+   * Actual `404 NotFound`
+
+3. `ContributionCycleAndContributionTests.RecordContribution_SameUserSameCycleDifferentIdempotencyKeys_Returns409ProblemJson`
+
+   * Expected `409 Conflict`
+   * Actual `404 NotFound`
+
+The failures were caused by database/application integration problems, including the in-memory user store not satisfying the database foreign key and the save happening too late in the request pipeline.
+
+## SaveChangesMiddleware finding and fix
+
+`SaveChangesMiddleware` originally saved after the response had already been sent. This meant database errors could be hidden from the central exception handler and contributed to the three failing integration tests.
+
+The middleware was changed so that it buffers the response and performs `SaveChangesAsync` **before the response is sent**. Database failures can therefore reach the exception handler and produce the intended problem response.
+
+The transcript subsequently showed the previously failing unknown-user test passing:
+
+```text
+Test summary: total: 1, failed: 0, succeeded: 1, skipped: 0
+Build succeeded with 6 warning(s)
+```
+
+## User foreign-key finding
+
+Users remain in memory through `InMemoryUserRepository`.
+
+Because `StokvelMembers.UserId` has a real database foreign key to `Users.Id`, an in-memory-only user could not satisfy the constraint. This produced:
+
+```text
+23503: insert or update on table "StokvelMembers"
+violates foreign key constraint "FK_StokvelMembers_Users_UserId"
+```
+
+The temporary solution is `MirroringUserRepository`, which mirrors the in-memory user into the EF `Users` table and calls `SaveChangesAsync` so the row exists before the membership is saved.
+
+The clean architectural solution is to move users fully to EF Core rather than maintaining two sources of truth.
+
+## Startup seed / shared database finding
+
+The integration tests use the development database, and the application startup seed adds a stokvel on every application start. This caused accumulated test data.
+
+For example, the database audit showed multiple `Test Stokvel` and `Ubuntu Savings Circle` rows. Two empty `Ubuntu Savings Circle` rows were removed during cleanup:
+
+```text
+DELETE 2
+```
+
+The test database should ideally be isolated from the development database in a future cleanup.
+
+## Definition of Done
+
+| Requirement                                                           | Evidence                                                                               | Status                    |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------- |
+| Queries filter/page in SQL rather than materialising everything first | Query audit and projection/paging implementations                                      | Done                      |
+| Contribution listing uses projection                                  | `StokvelEndpoints.cs` projection query                                                 | Done                      |
+| Pagination has a defined contract                                     | `PagingModels.cs`, query services and integration tests                                | Done                      |
+| Invalid sort/filter input returns 400                                 | Allow-list implementation and tests                                                    | Done                      |
+| Composite contribution paging index exists                            | `20261006062004_AddContributionPagingIndex`                                            | Done                      |
+| Duplicate contribution invariant checked                              | SQL returned 0 duplicate groups                                                        | Done                      |
+| Duplicate payout invariant checked                                    | SQL returned 0 duplicate groups                                                        | Done                      |
+| Database relationships and foreign keys exist                         | EF migration applied successfully                                                      | Done                      |
+| Database save occurs before response is sent                          | `SaveChangesMiddleware` updated                                                        | Done                      |
+| In-memory users satisfy database FK                                   | `MirroringUserRepository` writes mirror rows                                           | Done — temporary solution |
+| Users are fully EF Core-backed                                        | Not yet implemented                                                                    | **Not done**              |
+| Startup seed is isolated from integration tests                       | Tests still share development database                                                 | **Not done**              |
+| Before/after EXPLAIN plans are recorded                               | `docs/query.sql` was missing, so plans were not captured                               | **Not done**              |
+| Full test suite is green                                              | Baseline was 27/30; supplied transcript does not provide a verified final 30/30 result | **Not verified**          |
+| No password placeholder remains                                       | Must run `git grep -n "<your password>"` and require no output                         | **Must verify**           |
+
+## Findings to retain
+
+1. **SaveChangesMiddleware:** it originally saved after the response was sent, hiding database errors and contributing to the three failing tests. It now buffers the response and saves first.
+
+2. **Users:** users live in memory, so a mirror row is written to `Users` to satisfy the foreign key. The clean fix is moving users to EF Core.
+
+3. **Startup/test database:** startup seeding adds a stokvel on every application start, while tests share the development database. This causes test data to accumulate.
+
+4. **Query plans:** the intended before/after EXPLAIN comparison could not be recorded because `docs\query.sql` was missing during the captured run. No plan numbers should be fabricated.
