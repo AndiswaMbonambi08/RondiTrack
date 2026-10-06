@@ -25,6 +25,13 @@
   </ItemGroup>
 
   <ItemGroup>
+  <Compile Remove="RondiTrack.Tests\**" />
+  <Content Remove="RondiTrack.Tests\**" />
+  <EmbeddedResource Remove="RondiTrack.Tests\**" />
+  <None Remove="RondiTrack.Tests\**" />
+</ItemGroup>
+
+  <ItemGroup>
   <InternalsVisibleTo Include="RondiTrack.Tests" />
 </ItemGroup>
   
