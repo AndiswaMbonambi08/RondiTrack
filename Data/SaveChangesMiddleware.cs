@@ -1,8 +1,7 @@
-// Runs once per request, after everything else. Because Stokvel.AddMember
-// changes an in-memory list rather than calling any repository method, EF
-// never sees that change on its own. Here we check every Stokvel EF loaded
-// this request, work out which memberships are new or removed, write those
-// rows, and save. This keeps the repository interface completely unchanged.
+// Runs once per request. Stokvel.AddMember changes an in-memory list, so EF never sees it on its own.
+// After the endpoint runs, we reconcile memberships and save BEFORE the response is released to the client.
+// The response is buffered so that a database error (unique violation, concurrency conflict) still reaches
+// the central exception handler as a proper 409/412 instead of arriving after a success was already sent.
 using Microsoft.EntityFrameworkCore;
 using RondiTrack.Domain;
 using RondiTrack.Persistence.Entities;
@@ -13,15 +12,33 @@ public class SaveChangesMiddleware
 {
     private readonly RequestDelegate _next;
 
-    public SaveChangesMiddleware(RequestDelegate next)
-    {
-        _next = next;
-    }
+    public SaveChangesMiddleware(RequestDelegate next) => _next = next;
 
     public async Task InvokeAsync(HttpContext context, RondiTrackDbContext db)
     {
-        await _next(context);
+        var original = context.Response.Body;
+        await using var buffer = new MemoryStream();
+        context.Response.Body = buffer;
 
+        try
+        {
+            await _next(context);
+            await ReconcileMembershipsAsync(db);
+            await db.SaveChangesAsync();
+        }
+        catch
+        {
+            context.Response.Body = original;   // nothing was sent yet, so the exception handler can still set the status
+            throw;
+        }
+
+        context.Response.Body = original;
+        buffer.Position = 0;
+        await buffer.CopyToAsync(original);
+    }
+
+    private static async Task ReconcileMembershipsAsync(RondiTrackDbContext db)
+    {
         foreach (var entry in db.ChangeTracker.Entries<Stokvel>().ToList())
         {
             var stokvel = entry.Entity;
@@ -31,18 +48,12 @@ public class SaveChangesMiddleware
                 .Select(sm => sm.UserId)
                 .ToListAsync();
 
-            // Add any member that's in the in-memory list but not yet in the table.
             foreach (var memberId in stokvel.MemberIds)
             {
                 if (!existingMemberIds.Contains(memberId))
-                {
-                    db.StokvelMembers.Add(new RondiTrack.Persistence.Entities.StokvelMember(
-                    stokvel.Id, memberId, RondiTrack.Persistence.Entities.StokvelMemberRole.Member, DateTime.UtcNow));
-                       
-                }
+                    db.StokvelMembers.Add(new StokvelMember(stokvel.Id, memberId, StokvelMemberRole.Member, DateTime.UtcNow));
             }
 
-            // Remove any row in the table that's no longer in the in-memory list.
             var removedIds = existingMemberIds.Except(stokvel.MemberIds).ToList();
             if (removedIds.Count > 0)
             {
@@ -52,7 +63,5 @@ public class SaveChangesMiddleware
                 db.StokvelMembers.RemoveRange(rowsToRemove);
             }
         }
-
-        await db.SaveChangesAsync();
     }
 }
