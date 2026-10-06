@@ -12,6 +12,10 @@ public class Payout
     public decimal Amount { get; private set; }
     public DateTime PayoutDate { get; private set; }
 
+    // PostgreSQL/EF Core concurrency token.
+    // The database increments this value whenever the row is updated.
+    public uint Version { get; private set; }
+
     // EF Core needs a constructor it can call without arguments when loading
     // rows back from the database. The public constructor below stays the
     // only way application code creates a Payout.

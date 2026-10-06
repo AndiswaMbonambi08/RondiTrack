@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RondiTrack.Data;
 using Xunit;
+using RondiTrack.Domain;
+using RondiTrack.Services;
 
 namespace RondiTrack.Tests.Integration;
 
@@ -19,9 +21,52 @@ public class ConcurrencyTests : IClassFixture<WebApplicationFactory<Program>>
         _client = factory.CreateClient();
     }
 
-    // ADAPT: reuse the setup from PayoutRollbackTests and return the new payout's id.
-    private Task<Guid> SeedPayoutAsync() => throw new NotImplementedException();
+private async Task<Guid> SeedPayoutAsync()
+{
+    using var scope = _factory.Services.CreateScope();
 
+    var db = scope.ServiceProvider.GetRequiredService<RondiTrackDbContext>();
+    var stokvelRepo = scope.ServiceProvider.GetRequiredService<IStokvelRepository>();
+    var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+    var cycleRepo = scope.ServiceProvider.GetRequiredService<IContributionCycleRepository>();
+
+    var user = new User(
+        "Concurrency Test User",
+        $"{Guid.NewGuid()}@example.com");
+
+    await userRepo.AddAsync(user);
+
+    var stokvel = new Stokvel("Concurrency Test Stokvel", 100m);
+    stokvel.AddMember(user);
+    await stokvelRepo.AddAsync(stokvel);
+
+    db.StokvelMembers.Add(
+        new RondiTrack.Persistence.Entities.StokvelMember(
+            stokvel.Id,
+            user.Id,
+            RondiTrack.Persistence.Entities.StokvelMemberRole.Member,
+            DateTime.UtcNow));
+
+    await db.SaveChangesAsync();
+
+    var cycle = new ContributionCycle(
+        stokvel.Id,
+        "2026-10",
+        100m);
+
+    await cycleRepo.AddAsync(cycle);
+
+    var payout = new Payout(
+        stokvel.Id,
+        cycle.Id,
+        user.Id,
+        100m);
+
+    db.Payouts.Add(payout);
+    await db.SaveChangesAsync();
+
+    return payout.Id;
+}
     [Fact]
     public async Task TwoContexts_SecondSaveOfStalePayout_ThrowsConcurrencyException()
     {

@@ -83,4 +83,5 @@ public class RondiTrackDbContext : DbContext
             b.HasKey(p => p.Id);
             b.Property(p => p.Version).IsRowVersion();     // needs: public uint Version { get; private set; } on Payout
         });
+    }
 }
