@@ -28,7 +28,7 @@ public static class StokvelEndpoints
         .WithDescription("Returns every stokvel with its member count. Never fails; an empty store returns an empty array.")
         .Produces<IEnumerable<StokvelResponse>>(StatusCodes.Status200OK);
 
-        group.MapGet("/{id:guid}", async (Guid id, IStokvelRepository repo) =>
+     /*     group.MapGet("/{id:guid}", async (Guid id, IStokvelRepository repo) =>
         {
             var stokvel = await repo.GetByIdAsync(id)
                 ?? throw new NotFoundException("Stokvel not found.");
@@ -39,8 +39,8 @@ public static class StokvelEndpoints
             Example response (200):
             { "id": "...", "name": "Ubuntu Savings Circle", "contributionAmount": 500, "memberCount": 2 }
             """)
-        .Produces<StokvelResponse>(StatusCodes.Status200OK)
-        .ProducesProblem(StatusCodes.Status404NotFound);
+        .Produces<StokvelResponse>(StatusCodes.Status200OK) 
+        .ProducesProblem(StatusCodes.Status404NotFound); */
 
         group.MapPost("/", async (StokvelRequest request, IStokvelRepository repo) =>
         {

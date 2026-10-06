@@ -62,6 +62,7 @@ app.MapUserEndpoints();
 app.MapStokvelEndpoints();
 app.MapContributionCycleEndpoints();
 app.MapPayoutEndpoints();
+app.MapPagedListEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
