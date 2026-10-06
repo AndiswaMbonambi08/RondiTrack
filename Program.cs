@@ -30,6 +30,8 @@ builder.Services.AddScoped<IContributionCycleRepository, EfContributionCycleRepo
 builder.Services.AddScoped<IPayoutRepository, EfPayoutRepository>();
 builder.Services.AddScoped<IPayoutService, PayoutService>();
 builder.Services.AddScoped<IStokvelMemberRepository, EfStokvelMemberRepository>();
+builder.Services.AddScoped<ContributionQueryService>();
+builder.Services.AddScoped<MemberQueryService>();
 
 // Not swapped yet — a stated decision, not an oversight. See README.
 builder.Services.AddSingleton<InMemoryUserRepository>();
@@ -39,6 +41,9 @@ builder.Services.AddScoped<IStokvelService, StokvelService>();
 
 var app = builder.Build();
 
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddProblemDetails();
+// after app is built, before MapControllers():
 app.UseExceptionHandler();
 
 // Runs after every request; reconciles Stokvel's in-memory member list
