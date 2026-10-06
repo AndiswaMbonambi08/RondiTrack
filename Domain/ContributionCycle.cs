@@ -19,7 +19,7 @@ public class ContributionCycle
     public CycleStatus Status { get; private set; } = CycleStatus.Open;
 
     public Guid Id { get; }
-    public Guid StokvelId { get; }
+    public Guid StokvelId { get; private set; }
     public string Label { get; private set; }
     public decimal TargetAmount { get; private set; }
 

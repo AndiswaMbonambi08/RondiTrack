@@ -36,7 +36,8 @@ public class PayoutRollbackTests : IClassFixture<WebApplicationFactory<Program>>
         var stokvel = new Stokvel("Rollback Test Stokvel", 100m);
         stokvel.AddMember(user);
         await stokvelRepo.AddAsync(stokvel);
-        db.StokvelMembers.Add(new Persistence.Entities.StokvelMember { StokvelId = stokvel.Id, UserId = user.Id, JoinedAt = DateTime.UtcNow });
+        db.StokvelMembers.Add(new RondiTrack.Persistence.Entities.StokvelMember(
+        stokvel.Id, user.Id, RondiTrack.Persistence.Entities.StokvelMemberRole.Member, DateTime.UtcNow));
         await db.SaveChangesAsync();
 
         var cycle = new ContributionCycle(stokvel.Id, "2026-10", 100m);

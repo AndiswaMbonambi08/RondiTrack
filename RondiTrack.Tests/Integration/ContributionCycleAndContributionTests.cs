@@ -58,23 +58,24 @@ public class ContributionCycleAndContributionTests : IClassFixture<WebApplicatio
 
     [Fact]
     public async Task RecordContribution_ValidMemberAndCycle_Returns201()
+{
+    var user = await CreateUserAsync();
+    var stokvel = await CreateStokvelAsync();
+    var add = await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id });
+    Assert.True(add.IsSuccessStatusCode, "AddMember: " + (int)add.StatusCode + " " + await add.Content.ReadAsStringAsync());
+    var cycle = await CreateCycleAsync(stokvel.Id);
+
+    var request = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvel.Id}/contributions")
     {
-        var user = await CreateUserAsync();
-        var stokvel = await CreateStokvelAsync();
-        await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id });
-        var cycle = await CreateCycleAsync(stokvel.Id);
+        Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m })
+    };
+    request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvel.Id}/contributions")
-        {
-            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m })
-        };
-        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+    var response = await _client.SendAsync(request);
 
-        var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-    }
-
+    Assert.True(response.StatusCode == HttpStatusCode.Created,
+        "Record: " + (int)response.StatusCode + " " + await response.Content.ReadAsStringAsync());
+}
     [Fact]
     public async Task RecordContribution_MissingIdempotencyKey_Returns400ProblemJson()
     {

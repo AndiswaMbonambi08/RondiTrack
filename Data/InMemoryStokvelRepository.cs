@@ -8,10 +8,10 @@ public class InMemoryStokvelRepository : IStokvelRepository
 {
     private readonly ConcurrentDictionary<Guid, Stokvel> _stokvels = new();
 
-    public Task<IReadOnlyList<Stokvel>> GetAllAsync()
+    public Task<IReadOnlyList<Stokvel>> GetAllAsync(bool asNoTracking = false)
         => Task.FromResult((IReadOnlyList<Stokvel>)_stokvels.Values.ToList());
 
-    public Task<Stokvel?> GetByIdAsync(Guid id)
+    public Task<Stokvel?> GetByIdAsync(Guid id, bool asNoTracking = false)
         => Task.FromResult(_stokvels.GetValueOrDefault(id));
 
     public Task AddAsync(Stokvel stokvel)

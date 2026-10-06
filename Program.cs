@@ -19,12 +19,10 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 // with no isolation between them, and EF's change tracker would grow forever
 // without ever being cleared.
 builder.Services.AddDbContext<RondiTrackDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("RondiTrack"),
-        npgsql => npgsql.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(10),
-            errorCodesToAdd: null)));
+        options.UseNpgsql(connectionString)
+       .LogTo(Console.WriteLine,
+              new[] { Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted },
+              LogLevel.Information);
 
 // Swapped to EF Core. Scoped because they depend on the Scoped DbContext.
 builder.Services.AddScoped<IStokvelRepository, EfStokvelRepository>();
@@ -34,7 +32,8 @@ builder.Services.AddScoped<IPayoutService, PayoutService>();
 builder.Services.AddScoped<IStokvelMemberRepository, EfStokvelMemberRepository>();
 
 // Not swapped yet — a stated decision, not an oversight. See README.
-builder.Services.AddSingleton<IUserRepository, InMemoryUserRepository>();
+builder.Services.AddSingleton<InMemoryUserRepository>();
+builder.Services.AddScoped<IUserRepository, MirroringUserRepository>();
 builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 builder.Services.AddScoped<IStokvelService, StokvelService>();
 
@@ -66,6 +65,12 @@ using (var scope = app.Services.CreateScope())
     var stokvelRepo = scope.ServiceProvider.GetRequiredService<IStokvelRepository>();
 
     var users = await userRepo.GetAllAsync();
+
+    // StokvelMembers has a foreign key to the Users table, so the users must exist there first.
+    var existingIds = await db.Users.Select(u => u.Id).ToListAsync();
+    db.Users.AddRange(users.Where(u => !existingIds.Contains(u.Id)));
+    await db.SaveChangesAsync();
+
     var activeUsers = users.Where(u => u.IsActive).ToList();
 
     var stokvel = new Stokvel("Ubuntu Savings Circle", 500m);

@@ -5,6 +5,7 @@ namespace RondiTrack.Domain;
 
 public class Payout
 {
+    public Guid Id { get; private set; }
     public Guid StokvelId { get; private set; }
     public Guid ContributionCycleId { get; private set; }
     public Guid RecipientUserId { get; private set; }

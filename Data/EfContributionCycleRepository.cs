@@ -1,6 +1,6 @@
 // The real, database-backed version of IContributionCycleRepository. Swapped
 // alongside Stokvel because payout processing needs to update a cycle and
-// create a Payout inside the same transaction — only possible if they share
+// create a Payout inside the same transaction, only possible if they share
 // the same DbContext.
 using Microsoft.EntityFrameworkCore;
 using RondiTrack.Domain;
@@ -28,37 +28,7 @@ public class EfContributionCycleRepository : IContributionCycleRepository
         var query = _db.ContributionCycles.AsQueryable();
         if (asNoTracking) query = query.AsNoTracking();
         return await query.FirstOrDefaultAsync(c => c.Id == id);
-    }   
-
-    public async Task AddAsync(ContributionCycle cycle)
-    {
-        _db.ContributionCycles.Add(cycle);
-        await _db.SaveChangesAsync();
     }
-
-    public async Task DeleteAsync(Guid id)
-    {
-        var cycle = await _db.ContributionCycles.FindAsync(id);
-        if (cycle is not null)
-        {
-            _db.ContributionCycles.Remove(cycle);
-            await _db.SaveChangesAsync();
-        }
-    }
-}
-            await LoadMembersAsync(stokvel);
-        return stokvels;
-    }
-
-    public async Task<Stokvel?> GetByIdAsync(Guid id, bool asNoTracking = false)
-    {
-        var query = _db.Stokvels.AsQueryable();
-        if (asNoTracking) query = query.AsNoTracking();
-        var stokvel = await query.FirstOrDefaultAsync(s => s.Id == id);
-        if (stokvel is not null)
-            await LoadMembersAsync(stokvel);
-        return stokvel;
-    }   
 
     public async Task AddAsync(ContributionCycle cycle)
     {

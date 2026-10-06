@@ -31,31 +31,36 @@ public class PayoutService : IPayoutService
         _payoutRepo = payoutRepo;
     }
 
-    public async Task<PayoutResponse> ProcessPayoutAsync(Guid stokvelId, Guid contributionCycleId)
+   public async Task<PayoutResponse> ProcessPayoutAsync(Guid stokvelId, Guid contributionCycleId)
+{
+    var stokvel = await _stokvelRepo.GetByIdAsync(stokvelId)
+        ?? throw new NotFoundException("Stokvel not found.");
+
+    var cycle = await _cycleRepo.GetByIdAsync(contributionCycleId)
+        ?? throw new NotFoundException("Contribution cycle not found.");
+
+    if (cycle.StokvelId != stokvelId)
+        throw new NotFoundException("That contribution cycle does not belong to this stokvel.");
+
+    if (cycle.Status == Domain.CycleStatus.PayoutProcessed)
+        throw new ConflictException("This cycle's payout has already been processed.");
+
+    var pastRecipients = (await _payoutRepo.GetByStokvelIdAsync(stokvelId))
+        .Select(p => p.RecipientUserId)
+        .ToHashSet();
+
+    var recipientId = stokvel.MemberIds.FirstOrDefault(id => !pastRecipients.Contains(id));
+    if (recipientId == Guid.Empty)
+        throw new ConflictException("No eligible recipient remains for this stokvel.");
+
+    // EnableRetryOnFailure means a manually opened transaction can't just be
+    // awaited directly, it has to run inside the execution strategy's own
+    // retry-aware wrapper, or EF throws InvalidOperationException at runtime.
+    var strategy = _db.Database.CreateExecutionStrategy();
+
+    return await strategy.ExecuteAsync(async () =>
     {
-        var stokvel = await _stokvelRepo.GetByIdAsync(stokvelId)
-            ?? throw new NotFoundException("Stokvel not found.");
-
-        var cycle = await _cycleRepo.GetByIdAsync(contributionCycleId)
-            ?? throw new NotFoundException("Contribution cycle not found.");
-
-        if (cycle.StokvelId != stokvelId)
-            throw new NotFoundException("That contribution cycle does not belong to this stokvel.");
-
-        if (cycle.Status == Domain.CycleStatus.PayoutProcessed)
-            throw new ConflictException("This cycle's payout has already been processed.");
-
-        // Rotation rule: the earliest-joined member who has never received
-        // a payout from this stokvel yet.
-        var pastRecipients = (await _payoutRepo.GetByStokvelIdAsync(stokvelId))
-            .Select(p => p.RecipientUserId)
-            .ToHashSet();
-
-        var recipientId = stokvel.MemberIds.FirstOrDefault(id => !pastRecipients.Contains(id));
-        if (recipientId == Guid.Empty)
-            throw new ConflictException("No eligible recipient remains for this stokvel.");
-
-        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync();
+        await using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
             var payout = new Domain.Payout(stokvelId, contributionCycleId, recipientId, cycle.TargetAmount);
@@ -75,5 +80,6 @@ public class PayoutService : IPayoutService
             await transaction.RollbackAsync();
             throw;
         }
-    }
+    });
+}
 }
