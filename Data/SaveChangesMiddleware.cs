@@ -1,13 +1,11 @@
-// Runs once per request. Stokvel.AddMember changes an in-memory list, so EF never sees it on its own.
-// After the endpoint runs, we reconcile memberships and save BEFORE the response is released to the client.
-// The response is buffered so that a database error (unique violation, concurrency conflict) still reaches
-// the central exception handler as a proper 409/412 instead of arriving after a success was already sent.
 using Microsoft.EntityFrameworkCore;
 using RondiTrack.Domain;
 using RondiTrack.Persistence.Entities;
 
 namespace RondiTrack.Data;
 
+// Saves BEFORE the response is released to the client. The response is buffered so a database error
+// (unique violation, concurrency conflict) still reaches the central exception handler as a 409/412.
 public class SaveChangesMiddleware
 {
     private readonly RequestDelegate _next;
@@ -28,7 +26,7 @@ public class SaveChangesMiddleware
         }
         catch
         {
-            context.Response.Body = original;   // nothing was sent yet, so the exception handler can still set the status
+            context.Response.Body = original;
             throw;
         }
 

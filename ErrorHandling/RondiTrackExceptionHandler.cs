@@ -1,8 +1,3 @@
-// The single place every unhandled exception in RondiTrack passes through. Maps known
-// RondiTrackException types to their status code, maps database errors to 409 (unique
-// violation) and 412 (stale concurrency token), falls back to 400 for entity-level
-// ArgumentException, and 500 for anything truly unexpected. Every response and its
-// matching log line carry the same correlation ID (the request's TraceIdentifier).
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +30,6 @@ public class RondiTrackExceptionHandler : IExceptionHandler
             _ => (StatusCodes.Status500InternalServerError, "Internal Server Error")
         };
 
-        // Database errors get a fixed message, never the raw exception text (it can name tables and columns).
         var detail = exception switch
         {
             DbUpdateConcurrencyException
@@ -52,12 +46,7 @@ public class RondiTrackExceptionHandler : IExceptionHandler
             "Request failed. CorrelationId: {CorrelationId}, Method: {Method}, Path: {Path}, StatusCode: {StatusCode}",
             correlationId, httpContext.Request.Method, httpContext.Request.Path, statusCode);
 
-        var problemDetails = new ProblemDetails
-        {
-            Status = statusCode,
-            Title = title,
-            Detail = detail,
-        };
+        var problemDetails = new ProblemDetails { Status = statusCode, Title = title, Detail = detail };
         problemDetails.Extensions["correlationId"] = correlationId;
 
         httpContext.Response.StatusCode = statusCode;
