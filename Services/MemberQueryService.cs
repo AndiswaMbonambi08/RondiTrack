@@ -1,4 +1,12 @@
-public class MemberQueryService(AppDbContext db)
+using System.Globalization;
+using Microsoft.EntityFrameworkCore;
+using RondiTrack.Data;
+using RondiTrack.Paging;
+using RondiTrack.Persistence.Entities;
+
+namespace RondiTrack.Services;
+
+public class MemberQueryService(RondiTrackDbContext db)
 {
     public async Task<PagedResult<StokvelMember>> ListAsync(Guid stokvelId, MemberListQuery q, CancellationToken ct)
     {
@@ -12,7 +20,7 @@ public class MemberQueryService(AppDbContext db)
         var hash = PageTokenCodec.Hash($"{stokvelId}|{desc}|{q.Role}");
 
         IQueryable<StokvelMember> query = db.StokvelMembers.AsNoTracking().Where(m => m.StokvelId == stokvelId);
-        if (q.Role is { } r) query = query.Where(m => (int)m.Role == r);
+        if (q.Role is { } r) query = query.Where(m => m.Role == (StokvelMemberRole)r);
 
         if (!string.IsNullOrEmpty(q.PageToken))
         {

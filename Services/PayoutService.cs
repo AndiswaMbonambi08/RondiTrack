@@ -3,6 +3,7 @@
 // row, and marking the cycle as processed. If anything fails in between,
 // the whole thing rolls back and the database looks exactly like it did
 // before this call started.
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using RondiTrack.Data;
 using RondiTrack.Domain.Exceptions;

@@ -1,10 +1,12 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using RondiTrack.Data;
+using RondiTrack.Domain;
 using RondiTrack.Paging;
 
 namespace RondiTrack.Services;
 
-public class ContributionQueryService(AppDbContext db)
+public class ContributionQueryService(RondiTrackDbContext db)
 {
     public async Task<PagedResult<Contribution>> ListAsync(
         Guid stokvelId, Guid cycleId, ContributionListQuery q, CancellationToken ct)
@@ -28,6 +30,7 @@ public class ContributionQueryService(AppDbContext db)
             query = ApplyAfter(query, field, desc, tok);
         }
 
+        // Id is the unique tiebreaker, always ascending, so equal sort values can never swap across a page boundary.
         query = (field, desc) switch
         {
             ("recordedat", false) => query.OrderBy(c => c.RecordedAt).ThenBy(c => c.Id),
@@ -36,7 +39,7 @@ public class ContributionQueryService(AppDbContext db)
             _                     => query.OrderByDescending(c => c.Amount).ThenBy(c => c.Id),
         };
 
-        var rows = await query.Take(size + 1).ToListAsync(ct);   // one extra row = "is there more?" with no COUNT
+        var rows = await query.Take(size + 1).ToListAsync(ct);   // one extra row answers "is there more?" without COUNT(*)
         var page = rows.Take(size).ToList();
         var next = rows.Count > size ? PageTokenCodec.Encode(MakeToken(page[^1], field, hash)) : "";
         return new PagedResult<Contribution>(page, next);
@@ -56,7 +59,6 @@ public class ContributionQueryService(AppDbContext db)
     static PageToken MakeToken(Contribution c, string field, string hash) =>
         new(hash, field == "recordedat" ? c.RecordedAt.ToString("O") : c.Amount.ToString(CultureInfo.InvariantCulture), c.Id);
 
-    // Id is always ascending: "after" = past the key in the sort direction, or the same key with a larger Id.
     static IQueryable<Contribution> ApplyAfter(IQueryable<Contribution> q, string field, bool desc, PageToken t)
     {
         if (field == "recordedat")

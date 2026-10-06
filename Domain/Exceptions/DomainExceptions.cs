@@ -56,3 +56,13 @@ public class IdempotencyConflictException : RondiTrackException
 
     public IdempotencyConflictException(string message) : base(message) { }
 }
+
+// The request needs a precondition header (If-Match) and didn't send one. Used when updating a resource
+// that is protected by an optimistic concurrency token.
+public class PreconditionRequiredException : RondiTrackException
+{
+    public override int StatusCode => StatusCodes.Status428PreconditionRequired;
+    public override string Title => "Precondition Required";
+
+    public PreconditionRequiredException(string message) : base(message) { }
+}

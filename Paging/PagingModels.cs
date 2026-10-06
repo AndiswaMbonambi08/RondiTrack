@@ -1,10 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using RondiTrack.Domain.Exceptions;
 
 namespace RondiTrack.Paging;
 
-public sealed class InvalidPagingException(string message) : Exception(message);
+public sealed class InvalidPagingException(string message) : RequestValidationException(message);
 
 public record ContributionListQuery(
     int? PageSize, string? PageToken, string? OrderBy,
@@ -12,7 +13,7 @@ public record ContributionListQuery(
 
 public record MemberListQuery(int? PageSize, string? PageToken, string? OrderBy, int? Role);
 
-public record PagedResult<T>(IReadOnlyList<T> Items, string NextPageToken); // "" = no more results
+public record PagedResult<T>(IReadOnlyList<T> Items, string NextPageToken);   // NextPageToken == "" means no more results
 
 public record PageToken(string QueryHash, string Key, Guid Id);
 
@@ -40,6 +41,7 @@ public static class PageTokenCodec
     public static string Hash(string s) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(s)))[..16];
 
+    // Optional, default 25, reduced to 100 when larger, rejected when negative.
     public static int ClampSize(int? requested) => requested switch
     {
         null or 0 => 25,

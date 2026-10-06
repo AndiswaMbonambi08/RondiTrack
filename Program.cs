@@ -19,10 +19,12 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 // with no isolation between them, and EF's change tracker would grow forever
 // without ever being cleared.
 builder.Services.AddDbContext<RondiTrackDbContext>(options =>
-        options.UseNpgsql(connectionString)
-       .LogTo(Console.WriteLine,
-              new[] { Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted },
-              LogLevel.Information);
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("RondiTrack"),
+        npgsql => npgsql.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorCodesToAdd: null)));
 
 // Swapped to EF Core. Scoped because they depend on the Scoped DbContext.
 builder.Services.AddScoped<IStokvelRepository, EfStokvelRepository>();
@@ -41,8 +43,6 @@ builder.Services.AddScoped<IStokvelService, StokvelService>();
 
 var app = builder.Build();
 
-builder.Services.AddExceptionHandler<ApiExceptionHandler>();
-builder.Services.AddProblemDetails();
 // after app is built, before MapControllers():
 app.UseExceptionHandler();
 
