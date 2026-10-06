@@ -49,7 +49,7 @@ public class RondiTrackDbContext : DbContext
             b.HasKey(c => c.Id);
         });
 
-        modelBuilder.Entity<Contribution>(b =>
+               modelBuilder.Entity<Contribution>(b =>
         {
             b.HasKey(c => c.Id);
 
@@ -66,6 +66,12 @@ public class RondiTrackDbContext : DbContext
                 .WithMany(cc => cc.Contributions)
                 .HasForeignKey(c => c.ContributionCycleId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // STEP 9 (after the "before" plan): uncomment this index.
+            // WHERE StokvelId = ? AND ContributionCycleId = ? ORDER BY RecordedAt, Id
+            // Equality columns first, then the ORDER BY columns in order, so rows come out already sorted.
+            // b.HasIndex(c => new { c.ContributionCycleId, c.StokvelId, c.RecordedAt, c.Id })
+            //     .HasDatabaseName("ix_contributions_cycle_stokvel_recordedat_id");
         });
 
         modelBuilder.Entity<Payout>(b => b.HasKey(p => p.Id));
