@@ -72,8 +72,15 @@ public class RondiTrackDbContext : DbContext
             // Equality columns first, then the ORDER BY columns in order, so rows come out already sorted.
             // b.HasIndex(c => new { c.ContributionCycleId, c.StokvelId, c.RecordedAt, c.Id })
             //     .HasDatabaseName("ix_contributions_cycle_stokvel_recordedat_id");
+
+            b.HasIndex(c => new { c.ContributionCycleId, c.UserId })
+                .IsUnique()
+                .HasDatabaseName("ux_contributions_cycle_user");
         });
 
-        modelBuilder.Entity<Payout>(b => b.HasKey(p => p.Id));
-    }
+             modelBuilder.Entity<Payout>(b =>
+        {
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Version).IsRowVersion();     // needs: public uint Version { get; private set; } on Payout
+        });
 }
