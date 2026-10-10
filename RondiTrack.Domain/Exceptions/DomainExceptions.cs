@@ -2,7 +2,6 @@
 // legitimately fail once it's past validation, and carries the status code and title
 // the centralized handler should use for it. Validation (malformed input) is handled
 // separately by FluentValidation before code ever reaches this hierarchy.
-using Microsoft.AspNetCore.Http;
 
 namespace RondiTrack.Domain.Exceptions;
 
@@ -18,7 +17,7 @@ public abstract class RondiTrackException : Exception
 // with a specific resource or business rule (e.g. a missing required header).
 public class RequestValidationException : RondiTrackException
 {
-    public override int StatusCode => StatusCodes.Status400BadRequest;
+    public override int StatusCode => 400;
     public override string Title => "Bad Request";
 
     public RequestValidationException(string message) : base(message) { }
@@ -27,7 +26,7 @@ public class RequestValidationException : RondiTrackException
 // The thing the caller asked for doesn't exist.
 public class NotFoundException : RondiTrackException
 {
-    public override int StatusCode => StatusCodes.Status404NotFound;
+    public override int StatusCode => 404;
     public override string Title => "Not Found";
 
     public NotFoundException(string message) : base(message) { }
@@ -38,7 +37,7 @@ public class NotFoundException : RondiTrackException
 // contribution for a cycle already paid).
 public class ConflictException : RondiTrackException
 {
-    public override int StatusCode => StatusCodes.Status409Conflict;
+    public override int StatusCode => 409;
     public override string Title => "Conflict";
 
     public ConflictException(string message) : base(message) { }
@@ -51,7 +50,7 @@ public class ConflictException : RondiTrackException
 // the resource's current state. That distinction is why this is 422, not 409.
 public class IdempotencyConflictException : RondiTrackException
 {
-    public override int StatusCode => StatusCodes.Status422UnprocessableEntity;
+    public override int StatusCode => 422;
     public override string Title => "Unprocessable Entity";
 
     public IdempotencyConflictException(string message) : base(message) { }
