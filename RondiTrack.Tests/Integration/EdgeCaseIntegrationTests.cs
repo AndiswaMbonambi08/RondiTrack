@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 // Edge cases found by asking: what happens before the typical case exists yet (empty
 // collection), exactly at a validator's boundary, and when two independently valid
 // inputs are combined in a way a cross-entity rule rejects.
@@ -6,29 +7,33 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using RondiTrack.Dtos;
 using Xunit;
+using System.Text.Json;
 
 namespace RondiTrack.Tests.Integration;
 
-public class EdgeCaseIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class EdgeCaseIntegrationTests
 {
     private readonly HttpClient _client;
 
-    public EdgeCaseIntegrationTests(WebApplicationFactory<Program> factory)
+    public EdgeCaseIntegrationTests(PostgresApiFactory factory)
     {
         _client = factory.CreateClient();
     }
 
-    [Fact]
-    public async Task GetMembers_OnBrandNewStokvel_ReturnsEmptyArrayNotError()
+       [Fact]
+    public async Task GetMembers_OnBrandNewStokvel_ReturnsEmptyPageNotError()
     {
         var stokvel = (await (await _client.PostAsJsonAsync("/api/stokvels", new { name = "Empty Stokvel", contributionAmount = 100m }))
             .Content.ReadFromJsonAsync<StokvelResponse>(JsonOptions.CaseInsensitive))!;
 
         var response = await _client.GetAsync($"/api/stokvels/{stokvel.Id}/members");
-        var members = await response.Content.ReadFromJsonAsync<List<Guid>>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Empty(members!);
+
+        var page = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = page.EnumerateObject().First(p => p.Value.ValueKind == JsonValueKind.Array).Value;
+        Assert.Equal(0, items.GetArrayLength());
     }
 
     [Fact]

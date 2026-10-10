@@ -25,4 +25,7 @@ public class InMemoryStokvelRepository : IStokvelRepository
         _stokvels.TryRemove(id, out _);
         return Task.CompletedTask;
     }
+
+    public Task LoadContributionsAsync(Stokvel stokvel, Guid contributionCycleId) => Task.CompletedTask;
+    public void AddContribution(Contribution contribution) { }
 }

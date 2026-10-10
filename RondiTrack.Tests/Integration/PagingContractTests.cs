@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -6,10 +7,11 @@ using Xunit;
 
 namespace RondiTrack.Tests.Integration;
 
-public class PagingContractTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class PagingContractTests
 {
     private readonly HttpClient _client;
-    public PagingContractTests(WebApplicationFactory<Program> factory) => _client = factory.CreateClient();
+    public PagingContractTests(PostgresApiFactory factory) => _client = factory.CreateClient();
 
     private record Page(List<ContributionResponse> Items, string NextPageToken);
 

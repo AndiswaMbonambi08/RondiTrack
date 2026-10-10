@@ -60,4 +60,17 @@ public class EfStokvelRepository : IStokvelRepository
             .ToListAsync();
         stokvel.LoadMembers(memberIds);
     }
+
+        public async Task LoadContributionsAsync(Stokvel stokvel, Guid contributionCycleId)
+    {
+        var contributions = await _db.Contributions
+            .AsNoTracking()
+            .Where(c => c.StokvelId == stokvel.Id && c.ContributionCycleId == contributionCycleId)
+            .ToListAsync();
+        stokvel.LoadContributions(contributions);
+    }
+
+    // No SaveChanges here on purpose: SaveChangesMiddleware saves after the endpoint runs,
+    // the same way it does for member changes.
+    public void AddContribution(Contribution contribution) => _db.Contributions.Add(contribution);
 }

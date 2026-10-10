@@ -85,4 +85,13 @@ public class Stokvel
         _memberIds.Clear();
         _memberIds.AddRange(memberIds);
     }
+
+    // Same idea as LoadMembers: the EF repository calls this with the contributions already
+    // recorded for one cycle, so RecordContribution's duplicate rule has something to check.
+    internal void LoadContributions(IEnumerable<Contribution> contributions)
+    {
+        foreach (var c in contributions)
+            if (_contributions.All(x => x.Id != c.Id))
+                _contributions.Add(c);
+    }
 }

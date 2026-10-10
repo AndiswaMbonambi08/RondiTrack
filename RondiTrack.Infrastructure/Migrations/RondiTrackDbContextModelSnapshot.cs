@@ -45,7 +45,9 @@ namespace RondiTrack.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ContributionCycleId");
+                    b.HasIndex("ContributionCycleId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_contributions_cycle_user");
 
                     b.HasIndex("StokvelId", "UserId");
 
@@ -96,6 +98,12 @@ namespace RondiTrack.Migrations
 
                     b.Property<Guid>("StokvelId")
                         .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 

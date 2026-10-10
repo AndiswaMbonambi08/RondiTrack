@@ -16,12 +16,15 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.17.7" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="RondiTrack.Tests/**/*.cs" />
+    <Compile Remove="RondiTrack.Domain/**/*.cs" />
+    <Compile Remove="RondiTrack.Infrastructure/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,5 +37,10 @@
   <ItemGroup>
   <InternalsVisibleTo Include="RondiTrack.Tests" />
 </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="RondiTrack.Domain\RondiTrack.Domain.csproj" />
+    <ProjectReference Include="RondiTrack.Infrastructure\RondiTrack.Infrastructure.csproj" />
+  </ItemGroup>
   
 </Project>

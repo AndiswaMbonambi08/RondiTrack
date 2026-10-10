@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 // Integration tests for ContributionCycle CRUD and contribution recording.
 using System.Net;
 using System.Net.Http.Json;
@@ -7,11 +8,12 @@ using Xunit;
 
 namespace RondiTrack.Tests.Integration;
 
-public class ContributionCycleAndContributionTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class ContributionCycleAndContributionTests
 {
     private readonly HttpClient _client;
 
-    public ContributionCycleAndContributionTests(WebApplicationFactory<Program> factory)
+    public ContributionCycleAndContributionTests(PostgresApiFactory factory)
     {
         _client = factory.CreateClient();
     }

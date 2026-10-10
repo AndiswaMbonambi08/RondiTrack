@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="RondiTrack.csproj" />
+  <Project Path="RondiTrack.Domain/RondiTrack.Domain.csproj" />
+  <Project Path="RondiTrack.Infrastructure/RondiTrack.Infrastructure.csproj" />
   <Project Path="RondiTrack.Tests/RondiTrack.Tests.csproj" />
 </Solution>

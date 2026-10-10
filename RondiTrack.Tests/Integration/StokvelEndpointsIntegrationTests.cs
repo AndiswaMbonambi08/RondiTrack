@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 // Integration tests through the real pipeline for stokvels and membership.
 using System.Net;
 using System.Net.Http.Json;
@@ -7,11 +8,12 @@ using Xunit;
 
 namespace RondiTrack.Tests.Integration;
 
-public class StokvelEndpointsIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class StokvelEndpointsIntegrationTests
 {
     private readonly HttpClient _client;
 
-    public StokvelEndpointsIntegrationTests(WebApplicationFactory<Program> factory)
+    public StokvelEndpointsIntegrationTests(PostgresApiFactory factory)
     {
         _client = factory.CreateClient();
     }
