@@ -668,4 +668,9 @@ Determining projects to restore...
 C:\Users\Andiswa Mbonambi\RondiTrack\Data\RondiTrackDbContext.cs(86,2): error CS1513: } expected [C:\Users\Andiswa Mbonambi\RondiTrack\RondiTrack.csproj]
 
 ## Errors during the split
-Domain could not use StatusCodes from ASP.NET, so the exceptions now use numeric codes. LoadMembers is internal, so Domain exposes it to Infrastructure with InternalsVisibleTo. StokvelMember moved into Domain because Contribution references it. CS1705 was fixed by pinning EF Core packages in the API. The Testcontainers database starts empty, so the factory applies migrations before the app starts.
+
+- **`StatusCodes` not found in Domain.** `StatusCodes` is an ASP.NET Core type, and Domain has no reference to ASP.NET Core. The exceptions now use numeric status codes (e.g. 428), which keeps HTTP packages out of the Domain layer.
+- **`LoadMembers` is internal.** Infrastructure needs to call it, so Domain exposes its internals to Infrastructure with `InternalsVisibleTo`.
+- **`StokvelMember` moved into Domain.** `Contribution` references it, and Domain can't depend on a type living in Infrastructure.
+- **CS1705 (assembly version mismatch).** Fixed by pinning the EF Core package versions in the API project so they match Infrastructure.
+- **Testcontainers database starts empty.** The test factory now applies migrations before the app starts.

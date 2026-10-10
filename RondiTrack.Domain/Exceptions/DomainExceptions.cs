@@ -60,7 +60,7 @@ public class IdempotencyConflictException : RondiTrackException
 // that is protected by an optimistic concurrency token.
 public class PreconditionRequiredException : RondiTrackException
 {
-    public override int StatusCode => StatusCodes.Status428PreconditionRequired;
+    public override int StatusCode => 428;
     public override string Title => "Precondition Required";
 
     public PreconditionRequiredException(string message) : base(message) { }
