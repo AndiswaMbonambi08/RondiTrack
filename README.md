@@ -658,3 +658,14 @@ The test database should ideally be isolated from the development database in a 
 3. **Startup/test database:** startup seeding adds a stokvel on every application start, while tests share the development database. This causes test data to accumulate.
 
 4. **Query plans:** the intended before/after EXPLAIN comparison could not be recorded because `docs\query.sql` was missing during the captured run. No plan numbers should be fabricated.
+
+## Dependency direction and lifetimes (Assignment 5.4)
+[paste the lifetime table from Step 4/will double check]
+
+## Test run with the dev database stopped
+Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Users\Andiswa Mbonambi\RondiTrack\Data\RondiTrackDbContext.cs(86,2): error CS1513: } expected [C:\Users\Andiswa Mbonambi\RondiTrack\RondiTrack.csproj]
+
+## Errors during the split
+Domain could not use StatusCodes from ASP.NET, so the exceptions now use numeric codes. LoadMembers is internal, so Domain exposes it to Infrastructure with InternalsVisibleTo. StokvelMember moved into Domain because Contribution references it. CS1705 was fixed by pinning EF Core packages in the API. The Testcontainers database starts empty, so the factory applies migrations before the app starts.
