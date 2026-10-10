@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RondiTrack.csproj" />
+    <ProjectReference Include="..\RondiTrack.Infrastructure\RondiTrack.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
