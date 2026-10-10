@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 // Proves idempotency through the real pipeline: repeating a request with the same key
 // returns the identical response, and reusing a key with a different payload is rejected.
 using System.Net;
@@ -8,11 +9,12 @@ using Xunit;
 
 namespace RondiTrack.Tests.Integration;
 
-public class IdempotencyIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class IdempotencyIntegrationTests
 {
     private readonly HttpClient _client;
 
-    public IdempotencyIntegrationTests(WebApplicationFactory<Program> factory)
+    public IdempotencyIntegrationTests(PostgresApiFactory factory)
     {
         _client = factory.CreateClient();
     }

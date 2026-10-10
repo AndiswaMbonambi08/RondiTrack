@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -10,12 +11,13 @@ using RondiTrack.Services;
 
 namespace RondiTrack.Tests.Integration;
 
-public class ConcurrencyTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class ConcurrencyTests
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly PostgresApiFactory _factory;
     private readonly HttpClient _client;
 
-    public ConcurrencyTests(WebApplicationFactory<Program> factory)
+    public ConcurrencyTests(PostgresApiFactory factory)
     {
         _factory = factory;
         _client = factory.CreateClient();

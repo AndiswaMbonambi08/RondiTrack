@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 // Edge cases found by asking: what happens before the typical case exists yet (empty
 // collection), exactly at a validator's boundary, and when two independently valid
 // inputs are combined in a way a cross-entity rule rejects.
@@ -9,11 +10,12 @@ using Xunit;
 
 namespace RondiTrack.Tests.Integration;
 
-public class EdgeCaseIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class EdgeCaseIntegrationTests
 {
     private readonly HttpClient _client;
 
-    public EdgeCaseIntegrationTests(WebApplicationFactory<Program> factory)
+    public EdgeCaseIntegrationTests(PostgresApiFactory factory)
     {
         _client = factory.CreateClient();
     }

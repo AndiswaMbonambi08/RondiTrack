@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -9,12 +10,13 @@ using Xunit;
 
 namespace RondiTrack.Tests.Integration;
 
-public class UniqueConstraintTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class UniqueConstraintTests
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly PostgresApiFactory _factory;
     private readonly HttpClient _client;
 
-    public UniqueConstraintTests(WebApplicationFactory<Program> factory)
+    public UniqueConstraintTests(PostgresApiFactory factory)
     {
         _factory = factory;
         _client = factory.CreateClient();

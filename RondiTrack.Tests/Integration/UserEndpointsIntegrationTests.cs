@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 // Integration tests through the real pipeline (validation, endpoint, exception handler).
 using System.Net;
 using System.Net.Http.Json;
@@ -7,11 +8,12 @@ using Xunit;
 
 namespace RondiTrack.Tests.Integration;
 
-public class UserEndpointsIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class UserEndpointsIntegrationTests
 {
     private readonly HttpClient _client;
 
-    public UserEndpointsIntegrationTests(WebApplicationFactory<Program> factory)
+    public UserEndpointsIntegrationTests(PostgresApiFactory factory)
     {
         _client = factory.CreateClient();
     }

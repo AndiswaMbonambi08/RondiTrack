@@ -65,3 +65,4 @@ public class PreconditionRequiredException : RondiTrackException
 
     public PreconditionRequiredException(string message) : base(message) { }
 }
+

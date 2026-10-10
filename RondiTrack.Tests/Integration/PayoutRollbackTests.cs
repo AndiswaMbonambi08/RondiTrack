@@ -1,3 +1,4 @@
+﻿using RondiTrack.Tests.TestSupport;
 // Forces a failure partway through payout processing, then re-queries the
 // database directly to prove neither write (the Payout, or the cycle status
 // change) was left behind. Asserts by re-querying, not by checking a status code.
@@ -11,11 +12,12 @@ using Xunit;
 
 namespace RondiTrack.Tests.Integration;
 
-public class PayoutRollbackTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Postgres collection")]
+public class PayoutRollbackTests
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly PostgresApiFactory _factory;
 
-    public PayoutRollbackTests(WebApplicationFactory<Program> factory)
+    public PayoutRollbackTests(PostgresApiFactory factory)
     {
         _factory = factory;
     }
