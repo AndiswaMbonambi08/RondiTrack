@@ -660,17 +660,51 @@ The test database should ideally be isolated from the development database in a 
 4. **Query plans:** the intended before/after EXPLAIN comparison could not be recorded because `docs\query.sql` was missing during the captured run. No plan numbers should be fabricated.
 
 ## Dependency direction and lifetimes (Assignment 5.4)
-[paste the lifetime table from Step 4/will double check]
+
+Dependencies point inward: Api → Infrastructure → Domain. Domain references nothing else
+(no ASP.NET Core, no EF Core), so HTTP and database concerns can't leak into the rules.
+
+| Service | Lifetime | Why |
+|---|---|---|
+| RondiTrackDbContext | Scoped (AddDbContext default) | One unit of work per request; also what SaveChangesMiddleware saves |
+| IStokvelRepository → EfStokvelRepository | Scoped | Wraps the scoped DbContext |
+| IContributionCycleRepository → EfContributionCycleRepository | Scoped | Wraps the scoped DbContext |
+| IPayoutRepository → EfPayoutRepository | Scoped | Wraps the scoped DbContext |
+| IStokvelMemberRepository → EfStokvelMemberRepository | Scoped | Wraps the scoped DbContext |
+| IUserRepository → MirroringUserRepository | Scoped | Per-request wrapper over the singleton in-memory store |
+| IStokvelService → StokvelService | Scoped | Depends on scoped repositories |
+| IPayoutService → PayoutService | Scoped | Depends on scoped repositories |
+| ContributionQueryService, MemberQueryService | Scoped | Query the scoped DbContext |
+| InMemoryUserRepository | Singleton | Shared user store that outlives requests |
+| IIdempotencyStore → InMemoryIdempotencyStore | Singleton | Keys must be remembered across requests |
+
+No singleton depends on a scoped service, so there are no captive dependencies.
 
 ## Test run with the dev database stopped
-Determining projects to restore...
-  All projects are up-to-date for restore.
-C:\Users\Andiswa Mbonambi\RondiTrack\Data\RondiTrackDbContext.cs(86,2): error CS1513: } expected [C:\Users\Andiswa Mbonambi\RondiTrack\RondiTrack.csproj]
+
+The dev Postgres container (`ronditrack-postgres`) was stopped before running the suite.
+The integration tests use Testcontainers, which starts its own throwaway Postgres and applies
+the migrations before the app starts, so they don't depend on the dev database.
+
+```
+docker stop ronditrack-postgres
+dotnet test
+```
+
+Result: [paste the "Test summary: total: 38, failed: 0, succeeded: 38 ..." line from step 1]
 
 ## Errors during the split
 
-- **`StatusCodes` not found in Domain.** `StatusCodes` is an ASP.NET Core type, and Domain has no reference to ASP.NET Core. The exceptions now use numeric status codes (e.g. 428), which keeps HTTP packages out of the Domain layer.
-- **`LoadMembers` is internal.** Infrastructure needs to call it, so Domain exposes its internals to Infrastructure with `InternalsVisibleTo`.
+- **`StatusCodes` not found in Domain.** `StatusCodes` is an ASP.NET Core type and Domain has no reference to ASP.NET Core. The exceptions now use numeric status codes (e.g. 428), which keeps HTTP packages out of the Domain layer.
+- **`LoadMembers` is internal.** Infrastructure needs to call it, so Domain exposes its internals to Infrastructure with `InternalsVisibleTo`. `LoadContributions` follows the same pattern.
 - **`StokvelMember` moved into Domain.** `Contribution` references it, and Domain can't depend on a type living in Infrastructure.
 - **CS1705 (assembly version mismatch).** Fixed by pinning the EF Core package versions in the API project so they match Infrastructure.
 - **Testcontainers database starts empty.** The test factory now applies migrations before the app starts.
+- **PendingModelChangesWarning in the test factory.** The 5.3 unique index on (ContributionCycleId, UserId) and the `xmin` concurrency token had never been captured in a migration, so `MigrateAsync` refused to run. Fixed by adding the `SyncModelAfterSplit` migration, which also drops the now-redundant single-column index on `ContributionCycleId`.
+- **Duplicate routes (AmbiguousMatchException).** The original `GET .../members` and `GET .../cycles/{cycleId}/contributions` endpoints in `StokvelEndpoints.cs` were still mapped alongside the paged versions in `PagedListEndpoints.cs`, so each URL matched two endpoints and returned 500. The old copies were removed and the members test now reads the paged response.
+- **Contributions were never saved.** `Stokvel` kept contributions in a private list that was never loaded from or written to the database, so the API returned 201 for contributions it didn't persist and the duplicate rule could never fire. Added `LoadContributions` (read) and `AddContribution` (write, saved by `SaveChangesMiddleware` like memberships).
+
+## Known limitations
+
+- The idempotency record is stored before `SaveChangesMiddleware` saves the contribution. If that save fails, a retry with the same key would return the earlier success response for an unsaved contribution.
+- Two simultaneous requests for the same user and cycle are only stopped by the database unique index, which surfaces as a database error rather than the domain's 409.
