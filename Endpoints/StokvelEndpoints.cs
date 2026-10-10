@@ -88,7 +88,7 @@ public static class StokvelEndpoints
         .Produces(StatusCodes.Status204NoContent)
         .ProducesProblem(StatusCodes.Status404NotFound);
 
-        group.MapGet("/{id:guid}/members", async (Guid id, IStokvelRepository repo) =>
+/*         group.MapGet("/{id:guid}/members", async (Guid id, IStokvelRepository repo) =>
         {
             var stokvel = await repo.GetByIdAsync(id)
                 ?? throw new NotFoundException("Stokvel not found.");
@@ -97,7 +97,7 @@ public static class StokvelEndpoints
         .WithSummary("List a stokvel's member ids")
         .WithDescription("Returns an empty array for a stokvel with no members yet, not an error.")
         .Produces<IEnumerable<Guid>>(StatusCodes.Status200OK)
-        .ProducesProblem(StatusCodes.Status404NotFound);
+        .ProducesProblem(StatusCodes.Status404NotFound); */
 
         group.MapPost("/{id:guid}/members", async (Guid id, AddMemberRequest request, IStokvelService service) =>
         {
@@ -159,7 +159,7 @@ public static class StokvelEndpoints
         .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
         .AddEndpointFilter<ValidationFilter<RecordContributionRequest>>();
 
-            group.MapGet("/{stokvelId:guid}/cycles/{cycleId:guid}/contributions", async (
+          /*   group.MapGet("/{stokvelId:guid}/cycles/{cycleId:guid}/contributions", async (
             Guid stokvelId, Guid cycleId, RondiTrackDbContext db) =>
         {
             // NOT SHIPPED — eager loading, for comparison. One query (with
@@ -196,5 +196,6 @@ public static class StokvelEndpoints
         .WithSummary("List a cycle's contributions with contributor names")
         .WithDescription("Uses a projection query — fetches only the columns this response returns, not the full entity graph.")
         .Produces<IEnumerable<ContributionDetailResponse>>(StatusCodes.Status200OK);
+    } */
     }
 }
