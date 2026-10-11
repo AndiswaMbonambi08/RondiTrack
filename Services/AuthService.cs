@@ -56,10 +56,15 @@ public class AuthService(
         if (user is null || user.PasswordHash is null || !user.IsActive || result == PasswordVerificationResult.Failed)
             throw new InvalidCredentialsException();
 
-        return await IssueAsync(user, familyId: Guid.NewGuid());   // a new login starts a new family
+        var familyId = Guid.NewGuid();   // a new login starts a new family
+        var issued = await IssueAsync(user, familyId);
+
+        // Ids only. Never log a password, token, hash or email.
+        logger.LogInformation("Login succeeded. UserId: {UserId}, FamilyId: {FamilyId}", user.Id, familyId);
+        return issued;
     }
 
-       public async Task<AuthResult> RefreshAsync(string? presentedToken)
+    public async Task<AuthResult> RefreshAsync(string? presentedToken)
     {
         if (string.IsNullOrWhiteSpace(presentedToken))
             throw new InvalidSessionException();
@@ -93,7 +98,11 @@ public class AuthService(
         if (user is null || !user.IsActive)
             throw new InvalidSessionException();
 
-        return await IssueAsync(user, stored.FamilyId);   // same family: a descendant of the same login
+        var issued = await IssueAsync(user, stored.FamilyId);   // same family: a descendant of the same login
+
+        // Ids only. Never log a token or its hash.
+        logger.LogInformation("Refresh token rotated. UserId: {UserId}, FamilyId: {FamilyId}", user.Id, stored.FamilyId);
+        return issued;
     }
 
     private async Task RevokeFamilyAsync(RefreshToken token, DateTime now)
