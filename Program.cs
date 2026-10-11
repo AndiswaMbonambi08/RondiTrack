@@ -1,4 +1,5 @@
 using FluentValidation;
+using RondiTrack.Authorization;
 using RondiTrack.Data;
 using RondiTrack.Domain;
 using RondiTrack.Endpoints;
@@ -9,7 +10,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.IdentityModel.Tokens;
+using StokvelMemberRole = RondiTrack.Persistence.Entities.StokvelMemberRole;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,10 +37,27 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
             ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
             // The default is 5 minutes, which would quietly make a 15-minute token valid for 20.
-            ClockSkew = TimeSpan.FromSeconds(jwtOptions.ClockSkewSeconds)
+            ClockSkew = TimeSpan.FromSeconds(jwtOptions.ClockSkewSeconds),
+            NameClaimType = "sub",
+            RoleClaimType = "role"
         };
     });
-builder.Services.AddAuthorization();
+
+// Secure by default: anything without [AllowAnonymous] or an explicit policy needs a signed-in user.
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+    .AddPolicy(Policies.StokvelMember, p => p.RequireAuthenticatedUser()
+        .AddRequirements(new StokvelMemberRequirement(StokvelMemberRole.Member)))
+    .AddPolicy(Policies.StokvelTreasurer, p => p.RequireAuthenticatedUser()
+        .AddRequirements(new StokvelMemberRequirement(StokvelMemberRole.Treasurer)))
+    .AddPolicy(Policies.RecordContribution, p => p.RequireAuthenticatedUser()
+        .AddRequirements(new RecordContributionRequirement()));
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IStokvelMembershipLookup, StokvelMembershipLookup>();
+builder.Services.AddScoped<IAuthorizationHandler, StokvelMemberHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, RecordContributionHandler>();
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDetailsAuthorizationResultHandler>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 
 
@@ -91,8 +112,8 @@ app.UseMiddleware<SaveChangesMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 }
 
 app.MapUserEndpoints();
