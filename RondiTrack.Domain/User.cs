@@ -36,6 +36,17 @@ public class User
     {
         if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
             throw new ArgumentException("A valid email is required.", nameof(email));
-        Email = email.Trim().ToLowerInvariant();
+         Email = NormalizeEmail(email);
     }
+
+    public string? PasswordHash { get; private set; }
+
+    public void SetPasswordHash(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+            throw new ArgumentException("Password hash is required.", nameof(passwordHash));
+        PasswordHash = passwordHash;
+    }
+
+    public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 }
