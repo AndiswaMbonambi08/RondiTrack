@@ -75,3 +75,13 @@ public class InvalidCredentialsException : RondiTrackException
 
     public InvalidCredentialsException() : base("Invalid email or password.") { }
 }
+
+// Refresh failed. One answer for every reason (no cookie, unknown token, expired, already used,
+// revoked), so the response says nothing about which sessions exist.
+public class InvalidSessionException : RondiTrackException
+{
+    public override int StatusCode => 401;
+    public override string Title => "Unauthorized";
+
+    public InvalidSessionException() : base("Your session is invalid or has expired. Please sign in again.") { }
+}
