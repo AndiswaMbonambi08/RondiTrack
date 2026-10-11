@@ -74,31 +74,45 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<RondiTrackDbContext>();
     var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+    var inMemoryUsers = scope.ServiceProvider.GetRequiredService<InMemoryUserRepository>();
     var stokvelRepo = scope.ServiceProvider.GetRequiredService<IStokvelRepository>();
 
-    var users = await userRepo.GetAllAsync();
+    var usersInDb = await db.Users.AsNoTracking().ToListAsync();
 
-    // StokvelMembers has a foreign key to the Users table, so the users must exist there first.
-    var existingIds = await db.Users.Select(u => u.Id).ToListAsync();
-    db.Users.AddRange(users.Where(u => !existingIds.Contains(u.Id)));
-    await db.SaveChangesAsync();
-
-    var activeUsers = users.Where(u => u.IsActive).ToList();
-
-    var stokvel = new Stokvel("Ubuntu Savings Circle", 500m);
-    stokvel.AddMember(activeUsers[0]);
-    stokvel.AddMember(activeUsers[1]);
-    await stokvelRepo.AddAsync(stokvel);
-
-    // The seed runs outside any HTTP request, so the SaveChangesMiddleware
-    // never fires for it — save the membership rows directly here instead.
-    foreach (var memberId in stokvel.MemberIds)
+    if (usersInDb.Count > 0)
     {
-       db.StokvelMembers.Add(new RondiTrack.Persistence.Entities.StokvelMember(
-       stokvel.Id, memberId, RondiTrack.Persistence.Entities.StokvelMemberRole.Member, DateTime.UtcNow));
-        
+        // Not the first run: the database is the source of truth. The in-memory seed users get new
+        // Ids on every start, so swap them for the real rows. Ids then match the database, and users
+        // who registered earlier are known to the in-memory store again.
+        foreach (var seeded in (await inMemoryUsers.GetAllAsync()).ToList())
+            await inMemoryUsers.DeleteAsync(seeded.Id);
+        foreach (var existing in usersInDb)
+            await inMemoryUsers.AddAsync(existing);
     }
-    await db.SaveChangesAsync();
+    else
+    {
+        var users = await userRepo.GetAllAsync();
+
+        // StokvelMembers has a foreign key to the Users table, so the users must exist there first.
+        db.Users.AddRange(users);
+        await db.SaveChangesAsync();
+
+        var activeUsers = users.Where(u => u.IsActive).ToList();
+
+        var stokvel = new Stokvel("Ubuntu Savings Circle", 500m);
+        stokvel.AddMember(activeUsers[0]);
+        stokvel.AddMember(activeUsers[1]);
+        await stokvelRepo.AddAsync(stokvel);
+
+        // The seed runs outside any HTTP request, so the SaveChangesMiddleware
+        // never fires for it, so save the membership rows directly here instead.
+        foreach (var memberId in stokvel.MemberIds)
+        {
+            db.StokvelMembers.Add(new RondiTrack.Persistence.Entities.StokvelMember(
+                stokvel.Id, memberId, RondiTrack.Persistence.Entities.StokvelMemberRole.Member, DateTime.UtcNow));
+        }
+        await db.SaveChangesAsync();
+    }
 }
 
 app.Run();
