@@ -17,6 +17,7 @@ public interface IAuthService
     Task<UserResponse> RegisterAsync(RegisterRequest request);
     Task<AuthResult> LoginAsync(LoginRequest request);
     Task<AuthResult> RefreshAsync(string? presentedToken);
+    Task LogoutAsync(string? presentedToken);
 }
 
 public class AuthService(
@@ -124,4 +125,15 @@ public class AuthService(
     IRefreshTokenRepository refreshTokens,
     IOptions<JwtOptions> jwt,
     ILogger<AuthService> logger) : IAuthService
+
+    // Idempotent: no cookie, an unknown token and an already-revoked family all end the same way.
+    public async Task LogoutAsync(string? presentedToken)
+    {
+        if (string.IsNullOrWhiteSpace(presentedToken))
+            return;
+
+        var stored = await refreshTokens.FindByHashAsync(RefreshTokenGenerator.Hash(presentedToken));
+        if (stored is not null)
+            await refreshTokens.RevokeFamilyAsync(stored.FamilyId, DateTime.UtcNow);
+    }
 }
