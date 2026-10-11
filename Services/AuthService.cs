@@ -57,7 +57,7 @@ public class AuthService(
         return await IssueAsync(user, familyId: Guid.NewGuid());   // a new login starts a new family
     }
 
-    public async Task<AuthResult> RefreshAsync(string? presentedToken)
+       public async Task<AuthResult> RefreshAsync(string? presentedToken)
     {
         if (string.IsNullOrWhiteSpace(presentedToken))
             throw new InvalidSessionException();
@@ -65,19 +65,43 @@ public class AuthService(
         var now = DateTime.UtcNow;
         var stored = await refreshTokens.FindByHashAsync(RefreshTokenGenerator.Hash(presentedToken));
 
-        if (stored is null || stored.IsRevoked || stored.IsExpired(now))
+        if (stored is null)
             throw new InvalidSessionException();
 
-        // Claim the token. Only one caller can win this, even if two requests arrive at the same instant.
-        // A token that was already used fails here too (reuse detection is added in the next step).
-        if (!await refreshTokens.TryMarkUsedAsync(stored.Id, now))
+        // This token was already exchanged. The real client holds the newer one, so this is a replay.
+        // Kill every token from this login, including the newest one.
+        if (stored.IsUsed)
+        {
+            await RevokeFamilyAsync(stored, now);
             throw new InvalidSessionException();
+        }
+
+        if (stored.IsRevoked || stored.IsExpired(now))
+            throw new InvalidSessionException();
+
+        // Claim the token. Only one caller can win, even if two requests arrive at the same instant.
+        // The loser can't be told apart from a replay, so it's treated as one.
+        if (!await refreshTokens.TryMarkUsedAsync(stored.Id, now))
+        {
+            await RevokeFamilyAsync(stored, now);
+            throw new InvalidSessionException();
+        }
 
         var user = await credentials.FindByIdAsync(stored.UserId);
         if (user is null || !user.IsActive)
             throw new InvalidSessionException();
 
-        return await IssueAsync(user, stored.FamilyId);   // same family: this is a descendant of the same login
+        return await IssueAsync(user, stored.FamilyId);   // same family: a descendant of the same login
+    }
+
+    private async Task RevokeFamilyAsync(RefreshToken token, DateTime now)
+    {
+        await refreshTokens.RevokeFamilyAsync(token.FamilyId, now);
+
+        // Ids only. Never log a token or its hash.
+        logger.LogWarning(
+            "Refresh token reuse detected; session family revoked. UserId: {UserId}, FamilyId: {FamilyId}",
+            token.UserId, token.FamilyId);
     }
 
     private async Task<AuthResult> IssueAsync(User user, Guid familyId)
@@ -91,4 +115,13 @@ public class AuthService(
         var access = tokens.CreateAccessToken(user);
         return new AuthResult(new LoginResponse(access.Value, access.ExpiresInSeconds), raw, entity.ExpiresAtUtc);
     }
+
+    public class AuthService(
+    IUserRepository users,
+    IUserCredentialStore credentials,
+    IPasswordHasher<User> hasher,
+    ITokenService tokens,
+    IRefreshTokenRepository refreshTokens,
+    IOptions<JwtOptions> jwt,
+    ILogger<AuthService> logger) : IAuthService
 }
