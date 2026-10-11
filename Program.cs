@@ -7,8 +7,38 @@ using RondiTrack.Services;
 using Scalar.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+JwtOptions.EnsureValid(jwtOptions);
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o =>
+    {
+        o.MapInboundClaims = false;   // keep "sub" as "sub"
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            // The default is 5 minutes, which would quietly make a 15-minute token valid for 20.
+            ClockSkew = TimeSpan.FromSeconds(jwtOptions.ClockSkewSeconds)
+        };
+    });
+builder.Services.AddAuthorization();
+builder.Services.AddSingleton<ITokenService, TokenService>();
+
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
@@ -49,6 +79,8 @@ var app = builder.Build();
 
 // after app is built, before MapControllers():
 app.UseExceptionHandler();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Runs after every request; reconciles Stokvel's in-memory member list
 // against the real database table and saves everything in one go. See
