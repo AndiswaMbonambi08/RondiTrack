@@ -9,6 +9,7 @@ public class JwtOptions
     public string SigningKey { get; set; } = "";
     public int AccessTokenMinutes { get; set; } = 15;
     public int ClockSkewSeconds { get; set; } = 30;
+    public int RefreshTokenDays { get; set; } = 7;
 
     // Called at startup so a missing or weak key fails immediately with a clear message,
     // instead of surfacing later as a confusing error on the first login.
@@ -27,5 +28,8 @@ public class JwtOptions
 
         if (o.AccessTokenMinutes is < 1 or > 15)
             throw new InvalidOperationException("Jwt:AccessTokenMinutes must be between 1 and 15.");
+
+        if (o.RefreshTokenDays is < 1 or > 30)
+            throw new InvalidOperationException("Jwt:RefreshTokenDays must be between 1 and 30.");
     }
 }
