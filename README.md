@@ -787,3 +787,110 @@ An unknown email, a wrong password, an inactive account and an account without a
 - **Two tabs refreshing at once can log the user out** (see reuse detection above).
 - **Rotation is two database calls** (mark the old token used, then insert the new one). If the insert fails in between, that session ends and the user signs in again. It fails safe.
 - **The idempotency record is stored before the contribution is saved** (carried over from 5.4).
+
+## Authorization
+
+Authentication proves who the caller is. Authorization decides what they may do in one particular stokvel. They are separate code: JwtBearer validates the token, and the handlers in `Authorization/` answer the stokvel questions against the database.
+
+### Authorization matrix
+
+Cells are the status codes returned. A request with no token returns 401 problem JSON on every row except `/api/auth/*` and the OpenAPI pages, which are anonymous.
+
+| Endpoint | Non-member | Member | Treasurer | Admin | Platform admin |
+|---|---|---|---|---|---|
+| `GET /api/stokvels` (plain role check) | 403 | 403 | 403 | 403 | 200 |
+| `POST /api/stokvels` (creator becomes Admin) | 201 | 201 | 201 | 201 | 201 |
+| `PUT /api/stokvels/{id}` | 404 | 403 | 403 | 200 | 200 |
+| `DELETE /api/stokvels/{id}` | 404 | 403 | 403 | 204 | 204 |
+| `POST /api/stokvels/{id}/members` | 404 | 403 | 403 | 201 | 201 |
+| `DELETE /api/stokvels/{id}/members/{userId}` | 404 | 403 | 403 | 204 | 204 |
+| `GET /api/stokvels/{id}/members` | 404 | 200 | 200 | 200 | 200 |
+| `GET /api/stokvels/{id}/cycles/{cycleId}/contributions` | 404 | 200 | 200 | 200 | 200 |
+| `POST /api/stokvels/{id}/contributions` (own) | 404 | 201 | 201 | 201 | 201 |
+| `POST /api/stokvels/{id}/contributions` (someone else's) | 404 | 403 | 201 | 201 | 201 |
+| `POST /api/stokvels/{id}/cycles/{cycleId}/payout` | 404 | 403 | 201 | 201 | 201 |
+| `POST /api/contribution-cycles` (stokvel id in body) | 404 | 403 | 201 | 201 | 201 |
+| `GET /api/contribution-cycles` (own stokvels only) | 200 (empty) | 200 | 200 | 200 | 200 (all) |
+| `GET /api/contribution-cycles/{id}` | 404 | 200 | 200 | 200 | 200 |
+| `PUT /api/contribution-cycles/{id}` | 404 | 403 | 200 | 200 | 200 |
+| `DELETE /api/contribution-cycles/{id}` | 404 | 403 | 403 | 204 | 204 |
+| `GET /api/payouts/{id}` | 404 | 200 | 200 | 200 | 200 |
+| `PUT /api/payouts/{id}` | 404 | 403 | 200 | 200 | 200 |
+| `/api/users` and `/api/users/{id}` (self or platform admin) | 403 | 403 | 403 | 403 | 200 |
+
+Notes on the table:
+- Admin satisfies every Treasurer check. The role order is Member, then Treasurer, then Admin.
+- On `/api/users/{id}` a caller may act on their own record (200). The list and create routes have no id, so they are platform admin only.
+- Routes outside the `/api/stokvels/{id}` prefix look the stokvel up from the cycle or payout, then run the same policy. A non-member gets the same 404 text as a record that does not exist.
+
+### Why non-members get 404 and members without the role get 403
+
+A 404 for a non-member keeps the stokvel's existence private. A different status for "exists but not yours" would let anyone probe ids to discover which stokvels exist. A member without the required role already knows the stokvel exists, because they belong to it. A 404 would hide nothing from them and would only be misleading, so they get a 403.
+
+The handler records which case failed (`stokvel-not-member` or `stokvel-insufficient-role`) as an authorization failure reason. `ProblemDetailsAuthorizationResultHandler` turns that reason into the status code, so no try/catch is involved. The same handler returns 401 and 403 as `application/problem+json` with the same shape as the rest of the API (status, title, detail, correlationId).
+
+### Why per-stokvel roles are checked against the database and not carried in the token
+
+A role in RondiTrack is a fact about a person in one stokvel. The same login can be Treasurer of one stokvel and an ordinary Member of another, so a single role claim cannot describe it. Membership also changes during a session. If a chairperson removes a treasurer at 10:00, that person's token from 09:58 would still say Treasurer until it expires, and they could process a payout at 10:04.
+
+So the access token carries only `sub`, a unique `jti` and, for platform admins only, a `role` claim of `PlatformAdmin`. The platform admin flag is the one fact that is acceptable to be up to 15 minutes stale: it changes rarely and is set by an operator. Every stokvel check reads the caller's `StokvelMember` row on each request.
+
+### Test authentication
+
+The existing tests authenticate by minting a token in the test factory (`PostgresApiFactory.MintToken`), signed with a random key generated per run. Minting is faster than logging in and does not depend on the login code, so a bug in login cannot fail unrelated tests. No key is committed.
+
+The default test client is a platform admin who is allowed through stokvel checks. This keeps all 38 existing tests passing with no changed assertions, because they create stokvels as a caller who is not a member. The cost is that a platform admin can see every stokvel's money. This is a deliberate choice for operators, and platform admins stay out of stokvel membership when they create a stokvel.
+
+### Role-based vs policy-based
+
+The one plain role check is `GET /api/stokvels`:
+
+```csharp
+.RequireAuthorization(new AuthorizeAttribute { Roles = PlatformRoles.PlatformAdmin })
+```
+
+Everything else uses policies, for example `.RequireAuthorization(Policies.StokvelTreasurer)` on the payout route.
+
+If the rule changed:
+- **Role-based:** to also let an auditor list stokvels I would change this call site to accept a second role string, and change the token issuing code to emit the new claim. The rule lives in the route and in the token, and it stays stale until the token expires. Every new route that needs the rule repeats the role string.
+- **Policy-based:** to require Admin for payouts I change one word, `StokvelTreasurer` to `StokvelAdmin`, on one route. To change what a Treasurer is, for example "must have joined at least 30 days ago", I change `StokvelMemberHandler` once and every route that uses the policy follows. The rule is checked against the database, so it is never stale, and no role-name strings appear in the endpoints.
+
+That is why the role check is used only once, for a platform-level fact that really is a token-sized fact, and policies are used everywhere else.
+
+## Log excerpt (no secrets)
+
+Captured by running the app, registering, logging in and refreshing once. It contains only ids. No password, token, token hash or email appears.
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Sun, 11 Oct 2026 23:32:46 GMT
+Server: Kestrel
+Cache-Control: no-store
+Set-Cookie: refresh_token=lEOIIZOn3eKKJLljnOFNj0AoZZ_I8n4wPd1u2voOs54; expires=Sun, 18 Oct 2026 23:32:46 GMT; path=/api/auth; secure; samesite=strict; httponly
+Transfer-Encoding: chunked
+```
+
+Login logs `Login succeeded. UserId, FamilyId`, a successful refresh logs `Refresh token rotated. UserId, FamilyId`, and a replayed token logs `Refresh token reuse detected; session family revoked. UserId, FamilyId`. Failed logins are deliberately not logged with the email, because an email address is personal information.
+
+## Test result
+
+53 tests: the 38 existing tests with unchanged assertions plus 15 new ones (8 in `StokvelAuthorizationTests` and 7 in `AuthFlowTests`). Run on the Testcontainers fixture with the dev database container stopped (`docker stop ronditrack-postgres`).
+
+```
+Test summary: total: 53, failed: 0, succeeded: 53, skipped: 0, duration: 123.9s
+```
+
+The new tests cover: no token returns 401 problem JSON; non-member 404, member without the role 403 and treasurer 201 on the same payout endpoint; a member records their own contribution and is refused for someone else's (403); refresh rotates the token; replaying the old token returns 401 and the newer token is then also rejected; refresh after logout returns 401; logout is idempotent; a wrong password and an unknown email return identical problem details; the login response sets the hardened cookie and its body contains no refresh token; and `GET /api/stokvels` is 403 for an ordinary user and 200 for a platform admin.
+
+## Gaps I chose not to close yet
+
+- **No endpoint to change a member's role.** Members always join as Member and a stokvel's creator becomes Admin. A Treasurer can only be created by editing the database, which is how the tests do it. The seeded demo stokvel has no Treasurer or Admin.
+- **The platform admin flag is set with SQL only.** There is no endpoint for it, and a change takes up to 15 minutes to reach an existing token.
+- **Platform admins can see every stokvel's money.** This is deliberate, see the test authentication section.
+- **Not every matrix cell has its own test.** The payout, contribution and platform admin rows are tested. The other rows use the same handler and policies, but I did not write a test for each cell.
+- **Access tokens cannot be revoked before they expire.** Logout and reuse detection revoke refresh tokens, so the longest an old access token lives is 15 minutes.
+- **No rate limiting or lockout on login.** Brute force is slowed only by password hashing.
+- **The idempotency store is in memory and keyed only by the `Idempotency-Key` header.** It is not scoped per user and does not survive a restart.
+- **The user repository is still in memory with a mirror to the database.** This was a stated decision from earlier weeks. `POST /api/users` creates a user with no password, and is now platform admin only.
+- **Deleting a stokvel leaves its cycles, and deleting a user leaves their memberships.** Both were already documented gaps.
