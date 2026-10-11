@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RondiTrack.Data;
 using Testcontainers.PostgreSql;
 using Xunit;
+using System.Security.Cryptography;
 
 namespace RondiTrack.Tests.TestSupport;
 
@@ -35,6 +36,9 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // UseSetting, NOT ConfigureAppConfiguration: Program.cs reads the
         // connection string at startup, before the latter would apply.
         builder.UseSetting("ConnectionStrings:RondiTrack", _container.GetConnectionString());
+        
+        // A throwaway key per test run: nothing secret is committed and tests don't depend on anyone's user-secrets.
+        builder.UseSetting("Jwt:SigningKey", Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)));
     }
 
     async Task IAsyncLifetime.DisposeAsync() => await _container.DisposeAsync();
