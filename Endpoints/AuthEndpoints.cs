@@ -50,5 +50,16 @@ public static class AuthEndpoints
         .WithDescription("The refresh token works exactly once; a new one is set in the cookie. Any failure returns the same 401.")
         .Produces<LoginResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapPost("/logout", async (HttpContext http, IAuthService auth) =>
+        {
+            await auth.LogoutAsync(http.Request.Cookies[RefreshCookie.Name]);
+            RefreshCookie.Clear(http.Response);
+            return Results.NoContent();
+        })
+        .AllowAnonymous()   // must work even when the access token has already expired
+        .WithSummary("Sign out")
+        .WithDescription("Revokes the session's refresh tokens and clears the cookie. Always returns 204, so calling it twice, or with no cookie, is harmless.")
+        .Produces(StatusCodes.Status204NoContent);
     }
 }
