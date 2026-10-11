@@ -6,6 +6,7 @@ using RondiTrack.ErrorHandling;
 using RondiTrack.Services;
 using Scalar.AspNetCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +41,9 @@ builder.Services.AddSingleton<InMemoryUserRepository>();
 builder.Services.AddScoped<IUserRepository, MirroringUserRepository>();
 builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 builder.Services.AddScoped<IStokvelService, StokvelService>();
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<IUserCredentialStore, EfUserCredentialStore>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 var app = builder.Build();
 
@@ -59,6 +63,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapUserEndpoints();
+app.MapAuthEndpoints();
 app.MapStokvelEndpoints();
 app.MapContributionCycleEndpoints();
 app.MapPayoutEndpoints();
