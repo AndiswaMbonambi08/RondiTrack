@@ -708,3 +708,189 @@ Result: [paste the "Test summary: total: 38, failed: 0, succeeded: 38 ..." line 
 
 - The idempotency record is stored before `SaveChangesMiddleware` saves the contribution. If that save fails, a retry with the same key would return the earlier success response for an unsaved contribution.
 - Two simultaneous requests for the same user and cycle are only stopped by the database unique index, which surfaces as a database error rather than the domain's 409.
+
+## Authentication (Assignment 6.1)
+ 
+### Tokens
+
+**Access token.** A signed JWT (HS256) valid for **15 minutes** (`Jwt:AccessTokenMinutes`; startup rejects anything outside 1 to 15).
+**ClockSkew is 30 seconds** (`Jwt:ClockSkewSeconds`). The framework default is 5 minutes, which is added on top of the expiry, so a "15-minute" token would really be accepted for up to 20. 30 seconds still tolerates small clock drift between servers without meaningfully stretching the lifetime.
+
+| Claim | Value | Why it is safe to be up to 15 minutes stale |
+|---|---|---|
+| `sub` | The user's id | An account's id never changes |
+| `jti` | A random GUID | Only identifies the token, carries no meaning |
+| `iss`, `aud` | Fixed configuration values | Constants |
+| `iat`, `nbf`, `exp` | Issue, not-before and expiry times | Fixed when the token is issued |
+
+Deliberately **not** in the token: email, name, and any stokvel role or membership. Those can change within 15 minutes, so the API reads them from the database on each request.
+
+**Refresh token.** 32 random bytes (base64url). It is not a JWT: it means nothing by itself and is only a key into the `RefreshTokens` table. It is stored as a SHA-256 hash, never in plain form. A fast hash is enough here because the input is 256 bits of randomness, so there is nothing to brute-force (unlike a password), and it allows an indexed lookup. Lifetime is **7 days** (`Jwt:RefreshTokenDays`, 1 to 30).
+
+Passwords are hashed with ASP.NET Core's `PasswordHasher<User>`, with a minimum length of 12 enforced by FluentValidation. Emails are lower-cased and trimmed in the `User` entity and have a unique index (`ux_users_email`), so `Lerato@X.com` and `lerato@x.com` cannot both register.
+
+### Refresh cookie
+
+The refresh token travels only in a cookie and is never in a response body.
+
+| Flag | Value | Reason |
+|---|---|---|
+| `HttpOnly` | on | JavaScript cannot read the cookie, so an XSS bug cannot steal the long-lived token |
+| `Secure` | on | Only sent over HTTPS, never in plain text |
+| `SameSite` | `Strict` | Never sent on cross-site requests, which blocks CSRF against the refresh and logout endpoints |
+| `Path` | `/api/auth` | Only sent to the auth endpoints, not attached to every API call |
+| `Expires` | the token's expiry | The cookie disappears when the token would stop working anyway |
+
+`SameSite=Strict` assumes the frontend and the API are on the same site (for example `app.example.com` and `api.example.com`). If they were on unrelated domains, this would need `SameSite=None` plus a CSRF defence.
+
+### Advice to the frontend team
+
+- **Access token:** keep it in memory only (a JavaScript variable). On a page reload, call `POST /api/auth/refresh`; the browser sends the cookie automatically and returns a new access token.
+- **Refresh token:** the frontend never touches it. It lives in the HttpOnly cookie.
+- **What `localStorage` would lose.** Any script on the page, including one injected through an XSS bug or a compromised dependency, can read `localStorage`. A stolen access token is usable for up to 15 minutes. A stolen refresh token would be usable for 7 days, and could be used silently from another machine. The HttpOnly cookie removes that whole class of theft.
+
+### Rotation and reuse detection
+
+Every login starts a *family* of refresh tokens. Each refresh marks the presented token as used and issues a new one in the same family.
+
+If a token that is already marked used is presented again, the real client must hold a newer one, so the old one was replayed or stolen. The server **revokes every token in that family** and returns 401. The "claim" step is a single `UPDATE ... WHERE UsedAtUtc IS NULL`, so two simultaneous refreshes with the same token cannot both succeed; the loser is treated as a replay.
+
+**What the legitimate user experiences:** their next refresh fails with 401 and they sign in again with their password. Their current access token keeps working until it expires (at most 15 minutes). The same happens if they refresh from two tabs at the same instant. That is the price of the strict rule, and I chose not to add a grace window.
+
+Logout revokes the family of the presented refresh cookie, clears the cookie, and always returns 204, so it is idempotent and works even with no cookie or an expired access token.
+
+### Login does not leak which emails have accounts
+
+An unknown email, a wrong password, an inactive account and an account without a password all return the same 401 with the same message. Every failure path also verifies the password against a pre-computed dummy hash, so response time does not reveal which emails exist. Registration is the one place that must say an email is taken (409), as the brief requires.
+
+### Secrets
+
+- The signing key (`Jwt:SigningKey`) is stored with `dotnet user-secrets` and is never in `appsettings.json`. In other environments, set the `Jwt__SigningKey` environment variable.
+- The app **fails at startup** with a message explaining how to set the key if it is missing, shorter than 32 bytes, or if the issuer or audience is not configured. The message never prints the key.
+- The test factory generates a random key on each run, so no secret is committed and tests do not depend on anyone's user-secrets.
+- Every `dotnet ef` command also needs the key, because the check runs at startup.
+- Token reuse is logged with user and family ids only. Tokens, hashes and passwords are never logged. EF Core's command logging prints parameters as `?` because sensitive-data logging is not enabled.
+
+### Lifetimes added in this assignment
+
+| Service | Lifetime | Why |
+|---|---|---|
+| `IPasswordHasher<User>` | Singleton | Stateless |
+| `ITokenService` | Singleton | Stateless; reads immutable options |
+| `IUserCredentialStore` | Scoped | Wraps the scoped DbContext |
+| `IRefreshTokenRepository` | Scoped | Wraps the scoped DbContext |
+| `IAuthService` | Scoped | Depends on scoped repositories |
+
+### Gaps I chose not to close yet
+
+- **Logout does not invalidate the access token.** It is stateless and stays valid for up to 15 minutes. Closing this would need a revocation list checked on every request, which gives up the benefit of stateless tokens.
+- **Two tabs refreshing at once can log the user out** (see reuse detection above).
+- **Rotation is two database calls** (mark the old token used, then insert the new one). If the insert fails in between, that session ends and the user signs in again. It fails safe.
+- **The idempotency record is stored before the contribution is saved** (carried over from 5.4).
+
+## Authorization
+
+Authentication proves who the caller is. Authorization decides what they may do in one particular stokvel. They are separate code: JwtBearer validates the token, and the handlers in `Authorization/` answer the stokvel questions against the database.
+
+### Authorization matrix
+
+Cells are the status codes returned. A request with no token returns 401 problem JSON on every row except `/api/auth/*` and the OpenAPI pages, which are anonymous.
+
+| Endpoint | Non-member | Member | Treasurer | Admin | Platform admin |
+|---|---|---|---|---|---|
+| `GET /api/stokvels` (plain role check) | 403 | 403 | 403 | 403 | 200 |
+| `POST /api/stokvels` (creator becomes Admin) | 201 | 201 | 201 | 201 | 201 |
+| `PUT /api/stokvels/{id}` | 404 | 403 | 403 | 200 | 200 |
+| `DELETE /api/stokvels/{id}` | 404 | 403 | 403 | 204 | 204 |
+| `POST /api/stokvels/{id}/members` | 404 | 403 | 403 | 201 | 201 |
+| `DELETE /api/stokvels/{id}/members/{userId}` | 404 | 403 | 403 | 204 | 204 |
+| `GET /api/stokvels/{id}/members` | 404 | 200 | 200 | 200 | 200 |
+| `GET /api/stokvels/{id}/cycles/{cycleId}/contributions` | 404 | 200 | 200 | 200 | 200 |
+| `POST /api/stokvels/{id}/contributions` (own) | 404 | 201 | 201 | 201 | 201 |
+| `POST /api/stokvels/{id}/contributions` (someone else's) | 404 | 403 | 201 | 201 | 201 |
+| `POST /api/stokvels/{id}/cycles/{cycleId}/payout` | 404 | 403 | 201 | 201 | 201 |
+| `POST /api/contribution-cycles` (stokvel id in body) | 404 | 403 | 201 | 201 | 201 |
+| `GET /api/contribution-cycles` (own stokvels only) | 200 (empty) | 200 | 200 | 200 | 200 (all) |
+| `GET /api/contribution-cycles/{id}` | 404 | 200 | 200 | 200 | 200 |
+| `PUT /api/contribution-cycles/{id}` | 404 | 403 | 200 | 200 | 200 |
+| `DELETE /api/contribution-cycles/{id}` | 404 | 403 | 403 | 204 | 204 |
+| `GET /api/payouts/{id}` | 404 | 200 | 200 | 200 | 200 |
+| `PUT /api/payouts/{id}` | 404 | 403 | 200 | 200 | 200 |
+| `/api/users` and `/api/users/{id}` (self or platform admin) | 403 | 403 | 403 | 403 | 200 |
+
+Notes on the table:
+- Admin satisfies every Treasurer check. The role order is Member, then Treasurer, then Admin.
+- On `/api/users/{id}` a caller may act on their own record (200). The list and create routes have no id, so they are platform admin only.
+- Routes outside the `/api/stokvels/{id}` prefix look the stokvel up from the cycle or payout, then run the same policy. A non-member gets the same 404 text as a record that does not exist.
+
+### Why non-members get 404 and members without the role get 403
+
+A 404 for a non-member keeps the stokvel's existence private. A different status for "exists but not yours" would let anyone probe ids to discover which stokvels exist. A member without the required role already knows the stokvel exists, because they belong to it. A 404 would hide nothing from them and would only be misleading, so they get a 403.
+
+The handler records which case failed (`stokvel-not-member` or `stokvel-insufficient-role`) as an authorization failure reason. `ProblemDetailsAuthorizationResultHandler` turns that reason into the status code, so no try/catch is involved. The same handler returns 401 and 403 as `application/problem+json` with the same shape as the rest of the API (status, title, detail, correlationId).
+
+### Why per-stokvel roles are checked against the database and not carried in the token
+
+A role in RondiTrack is a fact about a person in one stokvel. The same login can be Treasurer of one stokvel and an ordinary Member of another, so a single role claim cannot describe it. Membership also changes during a session. If a chairperson removes a treasurer at 10:00, that person's token from 09:58 would still say Treasurer until it expires, and they could process a payout at 10:04.
+
+So the access token carries only `sub`, a unique `jti` and, for platform admins only, a `role` claim of `PlatformAdmin`. The platform admin flag is the one fact that is acceptable to be up to 15 minutes stale: it changes rarely and is set by an operator. Every stokvel check reads the caller's `StokvelMember` row on each request.
+
+### Test authentication
+
+The existing tests authenticate by minting a token in the test factory (`PostgresApiFactory.MintToken`), signed with a random key generated per run. Minting is faster than logging in and does not depend on the login code, so a bug in login cannot fail unrelated tests. No key is committed.
+
+The default test client is a platform admin who is allowed through stokvel checks. This keeps all 38 existing tests passing with no changed assertions, because they create stokvels as a caller who is not a member. The cost is that a platform admin can see every stokvel's money. This is a deliberate choice for operators, and platform admins stay out of stokvel membership when they create a stokvel.
+
+### Role-based vs policy-based
+
+The one plain role check is `GET /api/stokvels`:
+
+```csharp
+.RequireAuthorization(new AuthorizeAttribute { Roles = PlatformRoles.PlatformAdmin })
+```
+
+Everything else uses policies, for example `.RequireAuthorization(Policies.StokvelTreasurer)` on the payout route.
+
+If the rule changed:
+- **Role-based:** to also let an auditor list stokvels I would change this call site to accept a second role string, and change the token issuing code to emit the new claim. The rule lives in the route and in the token, and it stays stale until the token expires. Every new route that needs the rule repeats the role string.
+- **Policy-based:** to require Admin for payouts I change one word, `StokvelTreasurer` to `StokvelAdmin`, on one route. To change what a Treasurer is, for example "must have joined at least 30 days ago", I change `StokvelMemberHandler` once and every route that uses the policy follows. The rule is checked against the database, so it is never stale, and no role-name strings appear in the endpoints.
+
+That is why the role check is used only once, for a platform-level fact that really is a token-sized fact, and policies are used everywhere else.
+
+## Log excerpt (no secrets)
+
+Captured by running the app, registering, logging in and refreshing once. It contains only ids. No password, token, token hash or email appears.
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Sun, 11 Oct 2026 23:32:46 GMT
+Server: Kestrel
+Cache-Control: no-store
+Set-Cookie: refresh_token=lEOIIZOn3eKKJLljnOFNj0AoZZ_I8n4wPd1u2voOs54; expires=Sun, 18 Oct 2026 23:32:46 GMT; path=/api/auth; secure; samesite=strict; httponly
+Transfer-Encoding: chunked
+```
+
+Login logs `Login succeeded. UserId, FamilyId`, a successful refresh logs `Refresh token rotated. UserId, FamilyId`, and a replayed token logs `Refresh token reuse detected; session family revoked. UserId, FamilyId`. Failed logins are deliberately not logged with the email, because an email address is personal information.
+
+## Test result
+
+53 tests: the 38 existing tests with unchanged assertions plus 15 new ones (8 in `StokvelAuthorizationTests` and 7 in `AuthFlowTests`). Run on the Testcontainers fixture with the dev database container stopped (`docker stop ronditrack-postgres`).
+
+```
+Test summary: total: 53, failed: 0, succeeded: 53, skipped: 0, duration: 123.9s
+```
+
+The new tests cover: no token returns 401 problem JSON; non-member 404, member without the role 403 and treasurer 201 on the same payout endpoint; a member records their own contribution and is refused for someone else's (403); refresh rotates the token; replaying the old token returns 401 and the newer token is then also rejected; refresh after logout returns 401; logout is idempotent; a wrong password and an unknown email return identical problem details; the login response sets the hardened cookie and its body contains no refresh token; and `GET /api/stokvels` is 403 for an ordinary user and 200 for a platform admin.
+
+## Gaps I chose not to close yet
+
+- **No endpoint to change a member's role.** Members always join as Member and a stokvel's creator becomes Admin. A Treasurer can only be created by editing the database, which is how the tests do it. The seeded demo stokvel has no Treasurer or Admin.
+- **The platform admin flag is set with SQL only.** There is no endpoint for it, and a change takes up to 15 minutes to reach an existing token.
+- **Platform admins can see every stokvel's money.** This is deliberate, see the test authentication section.
+- **Not every matrix cell has its own test.** The payout, contribution and platform admin rows are tested. The other rows use the same handler and policies, but I did not write a test for each cell.
+- **Access tokens cannot be revoked before they expire.** Logout and reuse detection revoke refresh tokens, so the longest an old access token lives is 15 minutes.
+- **No rate limiting or lockout on login.** Brute force is slowed only by password hashing.
+- **The idempotency store is in memory and keyed only by the `Idempotency-Key` header.** It is not scoped per user and does not survive a restart.
+- **The user repository is still in memory with a mirror to the database.** This was a stated decision from earlier weeks. `POST /api/users` creates a user with no password, and is now platform admin only.
+- **Deleting a stokvel leaves its cycles, and deleting a user leaves their memberships.** Both were already documented gaps.

@@ -66,3 +66,22 @@ public class PreconditionRequiredException : RondiTrackException
     public PreconditionRequiredException(string message) : base(message) { }
 }
 
+// Login failed. Deliberately says nothing about WHICH part was wrong, so the response
+// can't be used to find out which emails have accounts.
+public class InvalidCredentialsException : RondiTrackException
+{
+    public override int StatusCode => 401;
+    public override string Title => "Unauthorized";
+
+    public InvalidCredentialsException() : base("Invalid email or password.") { }
+}
+
+// Refresh failed. One answer for every reason (no cookie, unknown token, expired, already used,
+// revoked), so the response says nothing about which sessions exist.
+public class InvalidSessionException : RondiTrackException
+{
+    public override int StatusCode => 401;
+    public override string Title => "Unauthorized";
+
+    public InvalidSessionException() : base("Your session is invalid or has expired. Please sign in again.") { }
+}

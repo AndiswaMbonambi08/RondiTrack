@@ -16,10 +16,15 @@ public class RondiTrackDbContext : DbContext
     public DbSet<ContributionCycle> ContributionCycles => Set<ContributionCycle>();
     public DbSet<Contribution> Contributions => Set<Contribution>();
     public DbSet<Payout> Payouts => Set<Payout>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>(b => b.HasKey(u => u.Id));
+        modelBuilder.Entity<User>(b => 
+            {
+                b.HasKey(u => u.Id);
+                b.HasIndex(u => u.Email).IsUnique().HasDatabaseName("ux_users_email");
+            });
 
         modelBuilder.Entity<Stokvel>(b =>
         {
@@ -82,6 +87,19 @@ public class RondiTrackDbContext : DbContext
         {
             b.HasKey(p => p.Id);
             b.Property(p => p.Version).IsRowVersion();     // needs: public uint Version { get; private set; } on Payout
+        });
+
+                modelBuilder.Entity<RefreshToken>(b =>
+        {
+            b.HasKey(t => t.Id);
+            b.Property(t => t.TokenHash).IsRequired().HasMaxLength(64);   // SHA-256 as hex
+            b.HasIndex(t => t.TokenHash).IsUnique().HasDatabaseName("ux_refresh_tokens_hash");
+            b.HasIndex(t => t.FamilyId).HasDatabaseName("ix_refresh_tokens_family");
+
+            b.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

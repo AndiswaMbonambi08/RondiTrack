@@ -1,3 +1,4 @@
+using RondiTrack.Authorization;
 using RondiTrack.Domain.Exceptions;
 using RondiTrack.Services;
 
@@ -13,15 +14,17 @@ public static class PayoutEndpoints
             var response = await service.ProcessPayoutAsync(stokvelId, cycleId);
             return Results.Created($"/api/stokvels/{stokvelId}/payouts/{response.Id}", response);
         })
+        .RequireAuthorization(Policies.StokvelTreasurer)
         .WithTags("Payouts")
         .WithSummary("Process the next eligible payout for a cycle")
         .WithDescription("""
-            Picks the earliest-joined member who hasn't received a payout from this
-            stokvel yet, records the payout, and marks the cycle as processed. Both
-            writes happen inside one transaction; fails 404 if either resource does
-            not exist, 409 if the cycle is already processed or no eligible member remains.
+            Treasurer or Admin of the stokvel only. Picks the earliest-joined member who hasn't received
+            a payout from this stokvel yet, records the payout, and marks the cycle as processed. Both
+            writes happen inside one transaction; fails 404 if either resource does not exist, 409 if
+            the cycle is already processed or no eligible member remains.
             """)
         .Produces<RondiTrack.Dtos.PayoutResponse>(StatusCodes.Status201Created)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);
     }

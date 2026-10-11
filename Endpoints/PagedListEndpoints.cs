@@ -1,3 +1,4 @@
+using RondiTrack.Authorization;
 using RondiTrack.Data;
 using RondiTrack.Domain;
 using RondiTrack.Domain.Exceptions;
@@ -32,7 +33,8 @@ public static class PagedListEndpoints
                 var page = await service.ListAsync(stokvelId, cycleId, query, ct);
                 return Results.Ok(new PagedResult<ContributionResponse>(
                     page.Items.Select(c => c.ToResponse()).ToList(), page.NextPageToken));
-            });
+            })
+            .RequireAuthorization(Policies.StokvelMember);
 
         app.MapGet("/api/stokvels/{stokvelId:guid}/members",
             async (Guid stokvelId, [AsParameters] MemberListQuery query,
@@ -47,6 +49,7 @@ public static class PagedListEndpoints
                 return Results.Ok(new PagedResult<MemberListItem>(
                     page.Items.Select(m => new MemberListItem(m.UserId, m.JoinedAtUtc, (int)m.Role)).ToList(),
                     page.NextPageToken));
-            });
+            })
+            .RequireAuthorization(Policies.StokvelMember);
     }
 }
