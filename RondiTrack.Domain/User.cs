@@ -8,6 +8,7 @@ public class User
     public string FullName { get; private set; }
     public string Email { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsPlatformAdmin { get; set; }
 
     public User(string fullName, string email)
     {

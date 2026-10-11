@@ -26,7 +26,8 @@ public class AuthService(
     IPasswordHasher<User> hasher,
     ITokenService tokens,
     IRefreshTokenRepository refreshTokens,
-    IOptions<JwtOptions> jwt) : IAuthService
+    IOptions<JwtOptions> jwt,
+    ILogger<AuthService> logger) : IAuthService
 {
     // Hashed once, so an unknown email costs about the same time as a wrong password.
     private static readonly Lazy<string> DummyHash =
@@ -116,15 +117,6 @@ public class AuthService(
         var access = tokens.CreateAccessToken(user);
         return new AuthResult(new LoginResponse(access.Value, access.ExpiresInSeconds), raw, entity.ExpiresAtUtc);
     }
-
-    public class AuthService(
-    IUserRepository users,
-    IUserCredentialStore credentials,
-    IPasswordHasher<User> hasher,
-    ITokenService tokens,
-    IRefreshTokenRepository refreshTokens,
-    IOptions<JwtOptions> jwt,
-    ILogger<AuthService> logger) : IAuthService
 
     // Idempotent: no cookie, an unknown token and an already-revoked family all end the same way.
     public async Task LogoutAsync(string? presentedToken)
