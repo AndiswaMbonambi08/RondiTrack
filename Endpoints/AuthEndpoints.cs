@@ -22,5 +22,15 @@ public static class AuthEndpoints
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status409Conflict)
         .AddEndpointFilter<ValidationFilter<RegisterRequest>>();
+
+        group.MapPost("/login", async (LoginRequest request, IAuthService auth) =>
+            Results.Ok(await auth.LoginAsync(request)))
+        .AllowAnonymous()
+        .WithSummary("Sign in")
+        .WithDescription("Returns a short-lived access token. An unknown email and a wrong password return the same 401.")
+        .Produces<LoginResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .AddEndpointFilter<ValidationFilter<LoginRequest>>();
     }
 }
