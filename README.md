@@ -708,3 +708,82 @@ Result: [paste the "Test summary: total: 38, failed: 0, succeeded: 38 ..." line 
 
 - The idempotency record is stored before `SaveChangesMiddleware` saves the contribution. If that save fails, a retry with the same key would return the earlier success response for an unsaved contribution.
 - Two simultaneous requests for the same user and cycle are only stopped by the database unique index, which surfaces as a database error rather than the domain's 409.
+
+## Authentication (Assignment 6.1)
+ 
+### Tokens
+
+**Access token.** A signed JWT (HS256) valid for **15 minutes** (`Jwt:AccessTokenMinutes`; startup rejects anything outside 1 to 15).
+**ClockSkew is 30 seconds** (`Jwt:ClockSkewSeconds`). The framework default is 5 minutes, which is added on top of the expiry, so a "15-minute" token would really be accepted for up to 20. 30 seconds still tolerates small clock drift between servers without meaningfully stretching the lifetime.
+
+| Claim | Value | Why it is safe to be up to 15 minutes stale |
+|---|---|---|
+| `sub` | The user's id | An account's id never changes |
+| `jti` | A random GUID | Only identifies the token, carries no meaning |
+| `iss`, `aud` | Fixed configuration values | Constants |
+| `iat`, `nbf`, `exp` | Issue, not-before and expiry times | Fixed when the token is issued |
+
+Deliberately **not** in the token: email, name, and any stokvel role or membership. Those can change within 15 minutes, so the API reads them from the database on each request.
+
+**Refresh token.** 32 random bytes (base64url). It is not a JWT: it means nothing by itself and is only a key into the `RefreshTokens` table. It is stored as a SHA-256 hash, never in plain form. A fast hash is enough here because the input is 256 bits of randomness, so there is nothing to brute-force (unlike a password), and it allows an indexed lookup. Lifetime is **7 days** (`Jwt:RefreshTokenDays`, 1 to 30).
+
+Passwords are hashed with ASP.NET Core's `PasswordHasher<User>`, with a minimum length of 12 enforced by FluentValidation. Emails are lower-cased and trimmed in the `User` entity and have a unique index (`ux_users_email`), so `Lerato@X.com` and `lerato@x.com` cannot both register.
+
+### Refresh cookie
+
+The refresh token travels only in a cookie and is never in a response body.
+
+| Flag | Value | Reason |
+|---|---|---|
+| `HttpOnly` | on | JavaScript cannot read the cookie, so an XSS bug cannot steal the long-lived token |
+| `Secure` | on | Only sent over HTTPS, never in plain text |
+| `SameSite` | `Strict` | Never sent on cross-site requests, which blocks CSRF against the refresh and logout endpoints |
+| `Path` | `/api/auth` | Only sent to the auth endpoints, not attached to every API call |
+| `Expires` | the token's expiry | The cookie disappears when the token would stop working anyway |
+
+`SameSite=Strict` assumes the frontend and the API are on the same site (for example `app.example.com` and `api.example.com`). If they were on unrelated domains, this would need `SameSite=None` plus a CSRF defence.
+
+### Advice to the frontend team
+
+- **Access token:** keep it in memory only (a JavaScript variable). On a page reload, call `POST /api/auth/refresh`; the browser sends the cookie automatically and returns a new access token.
+- **Refresh token:** the frontend never touches it. It lives in the HttpOnly cookie.
+- **What `localStorage` would lose.** Any script on the page, including one injected through an XSS bug or a compromised dependency, can read `localStorage`. A stolen access token is usable for up to 15 minutes. A stolen refresh token would be usable for 7 days, and could be used silently from another machine. The HttpOnly cookie removes that whole class of theft.
+
+### Rotation and reuse detection
+
+Every login starts a *family* of refresh tokens. Each refresh marks the presented token as used and issues a new one in the same family.
+
+If a token that is already marked used is presented again, the real client must hold a newer one, so the old one was replayed or stolen. The server **revokes every token in that family** and returns 401. The "claim" step is a single `UPDATE ... WHERE UsedAtUtc IS NULL`, so two simultaneous refreshes with the same token cannot both succeed; the loser is treated as a replay.
+
+**What the legitimate user experiences:** their next refresh fails with 401 and they sign in again with their password. Their current access token keeps working until it expires (at most 15 minutes). The same happens if they refresh from two tabs at the same instant. That is the price of the strict rule, and I chose not to add a grace window.
+
+Logout revokes the family of the presented refresh cookie, clears the cookie, and always returns 204, so it is idempotent and works even with no cookie or an expired access token.
+
+### Login does not leak which emails have accounts
+
+An unknown email, a wrong password, an inactive account and an account without a password all return the same 401 with the same message. Every failure path also verifies the password against a pre-computed dummy hash, so response time does not reveal which emails exist. Registration is the one place that must say an email is taken (409), as the brief requires.
+
+### Secrets
+
+- The signing key (`Jwt:SigningKey`) is stored with `dotnet user-secrets` and is never in `appsettings.json`. In other environments, set the `Jwt__SigningKey` environment variable.
+- The app **fails at startup** with a message explaining how to set the key if it is missing, shorter than 32 bytes, or if the issuer or audience is not configured. The message never prints the key.
+- The test factory generates a random key on each run, so no secret is committed and tests do not depend on anyone's user-secrets.
+- Every `dotnet ef` command also needs the key, because the check runs at startup.
+- Token reuse is logged with user and family ids only. Tokens, hashes and passwords are never logged. EF Core's command logging prints parameters as `?` because sensitive-data logging is not enabled.
+
+### Lifetimes added in this assignment
+
+| Service | Lifetime | Why |
+|---|---|---|
+| `IPasswordHasher<User>` | Singleton | Stateless |
+| `ITokenService` | Singleton | Stateless; reads immutable options |
+| `IUserCredentialStore` | Scoped | Wraps the scoped DbContext |
+| `IRefreshTokenRepository` | Scoped | Wraps the scoped DbContext |
+| `IAuthService` | Scoped | Depends on scoped repositories |
+
+### Gaps I chose not to close yet
+
+- **Logout does not invalidate the access token.** It is stateless and stays valid for up to 15 minutes. Closing this would need a revocation list checked on every request, which gives up the benefit of stateless tokens.
+- **Two tabs refreshing at once can log the user out** (see reuse detection above).
+- **Rotation is two database calls** (mark the old token used, then insert the new one). If the insert fails in between, that session ends and the user signs in again. It fails safe.
+- **The idempotency record is stored before the contribution is saved** (carried over from 5.4).
