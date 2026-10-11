@@ -10,4 +10,7 @@ public class EfUserCredentialStore(RondiTrackDbContext db) : IUserCredentialStor
 
     public Task<User?> FindByEmailAsync(string normalizedEmail) =>
         db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+
+    public Task<User?> FindByIdAsync(Guid id) =>
+        db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);
 }
