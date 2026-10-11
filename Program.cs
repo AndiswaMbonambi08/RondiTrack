@@ -65,6 +65,7 @@ builder.Services.AddScoped<IPayoutService, PayoutService>();
 builder.Services.AddScoped<IStokvelMemberRepository, EfStokvelMemberRepository>();
 builder.Services.AddScoped<ContributionQueryService>();
 builder.Services.AddScoped<MemberQueryService>();
+builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
 
 // Not swapped yet — a stated decision, not an oversight. See README.
 builder.Services.AddSingleton<InMemoryUserRepository>();
