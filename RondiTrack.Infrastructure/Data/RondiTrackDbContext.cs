@@ -19,7 +19,11 @@ public class RondiTrackDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>(b => b.HasKey(u => u.Id));
+        modelBuilder.Entity<User>(b => 
+            {
+                b.HasKey(u => u.Id);
+                b.HasIndex(u => u.Email).IsUnique().HasDatabaseName("ux_users_email");
+            });
 
         modelBuilder.Entity<Stokvel>(b =>
         {
