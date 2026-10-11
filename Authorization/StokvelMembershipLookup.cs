@@ -7,6 +7,7 @@ namespace RondiTrack.Authorization;
 public interface IStokvelMembershipLookup
 {
     Task<StokvelMemberRole?> GetRoleAsync(Guid stokvelId, Guid userId, CancellationToken ct);
+    Task<List<Guid>> GetStokvelIdsAsync(Guid userId, CancellationToken ct);
 }
 
 public sealed class StokvelMembershipLookup(RondiTrackDbContext db) : IStokvelMembershipLookup
@@ -16,4 +17,10 @@ public sealed class StokvelMembershipLookup(RondiTrackDbContext db) : IStokvelMe
             .Where(m => m.StokvelId == stokvelId && m.UserId == userId)
             .Select(m => (StokvelMemberRole?)m.Role)
             .FirstOrDefaultAsync(ct);
+
+    public async Task<List<Guid>> GetStokvelIdsAsync(Guid userId, CancellationToken ct) =>
+        await db.StokvelMembers.AsNoTracking()
+            .Where(m => m.UserId == userId)
+            .Select(m => m.StokvelId)
+            .ToListAsync(ct);
 }

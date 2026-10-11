@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RondiTrack.Authorization;
 using RondiTrack.Domain;
 using RondiTrack.Persistence.Entities;
 
@@ -12,7 +13,7 @@ public class SaveChangesMiddleware
 
     public SaveChangesMiddleware(RequestDelegate next) => _next = next;
 
-    public async Task InvokeAsync(HttpContext context, RondiTrackDbContext db)
+    public async Task InvokeAsync(HttpContext context, RondiTrackDbContext db, PendingMemberRoles pendingRoles)
     {
         var original = context.Response.Body;
         await using var buffer = new MemoryStream();
@@ -21,7 +22,7 @@ public class SaveChangesMiddleware
         try
         {
             await _next(context);
-            await ReconcileMembershipsAsync(db);
+            await ReconcileMembershipsAsync(db, pendingRoles);
             await db.SaveChangesAsync();
         }
         catch
@@ -35,7 +36,7 @@ public class SaveChangesMiddleware
         await buffer.CopyToAsync(original);
     }
 
-    private static async Task ReconcileMembershipsAsync(RondiTrackDbContext db)
+    private static async Task ReconcileMembershipsAsync(RondiTrackDbContext db, PendingMemberRoles pendingRoles)
     {
         foreach (var entry in db.ChangeTracker.Entries<Stokvel>().ToList())
         {
@@ -49,7 +50,8 @@ public class SaveChangesMiddleware
             foreach (var memberId in stokvel.MemberIds)
             {
                 if (!existingMemberIds.Contains(memberId))
-                    db.StokvelMembers.Add(new StokvelMember(stokvel.Id, memberId, StokvelMemberRole.Member, DateTime.UtcNow));
+                    db.StokvelMembers.Add(new StokvelMember(
+                        stokvel.Id, memberId, pendingRoles.RoleFor(stokvel.Id, memberId), DateTime.UtcNow));
             }
 
             var removedIds = existingMemberIds.Except(stokvel.MemberIds).ToList();

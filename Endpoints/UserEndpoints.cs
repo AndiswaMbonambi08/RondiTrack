@@ -6,6 +6,7 @@ using RondiTrack.Domain.Exceptions;
 using RondiTrack.Dtos;
 using RondiTrack.Mapping;
 using RondiTrack.Validation;
+using RondiTrack.Authorization;
 
 namespace RondiTrack.Endpoints;
 
@@ -13,7 +14,9 @@ public static class UserEndpoints
 {
     public static void MapUserEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/users").WithTags("Users");
+            // Self or platform admin. List and create have no {id}, so they are platform admin only.
+            var group = app.MapGroup("/api/users").WithTags("Users")
+            .RequireAuthorization(Policies.SelfOrPlatformAdmin);
 
         group.MapGet("/", async (IUserRepository repo) =>
         {

@@ -50,13 +50,20 @@ builder.Services.AddAuthorizationBuilder()
         .AddRequirements(new StokvelMemberRequirement(StokvelMemberRole.Member)))
     .AddPolicy(Policies.StokvelTreasurer, p => p.RequireAuthenticatedUser()
         .AddRequirements(new StokvelMemberRequirement(StokvelMemberRole.Treasurer)))
+    .AddPolicy(Policies.StokvelAdmin, p => p.RequireAuthenticatedUser()
+        .AddRequirements(new StokvelMemberRequirement(StokvelMemberRole.Admin)))
     .AddPolicy(Policies.RecordContribution, p => p.RequireAuthenticatedUser()
-        .AddRequirements(new RecordContributionRequirement()));
+        .AddRequirements(new RecordContributionRequirement()))
+    .AddPolicy(Policies.SelfOrPlatformAdmin, p => p.RequireAuthenticatedUser()
+        .AddRequirements(new SelfOrPlatformAdminRequirement()));
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IStokvelMembershipLookup, StokvelMembershipLookup>();
 builder.Services.AddScoped<IAuthorizationHandler, StokvelMemberHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, RecordContributionHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, SelfOrPlatformAdminHandler>();
+builder.Services.AddScoped<StokvelAccess>();
+builder.Services.AddScoped<PendingMemberRoles>();
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDetailsAuthorizationResultHandler>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 
