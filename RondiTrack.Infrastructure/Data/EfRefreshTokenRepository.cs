@@ -22,4 +22,11 @@ public class EfRefreshTokenRepository(RondiTrackDbContext db) : IRefreshTokenRep
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAtUtc, nowUtc));
         return rows == 1;
     }
+
+    // Runs immediately as its own statement, so it sticks even though the request that
+    // triggered it goes on to fail with a 401.
+    public Task RevokeFamilyAsync(Guid familyId, DateTime nowUtc) =>
+        db.RefreshTokens
+            .Where(t => t.FamilyId == familyId && t.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAtUtc, nowUtc));
 }
