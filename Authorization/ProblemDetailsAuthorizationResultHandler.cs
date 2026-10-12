@@ -11,12 +11,23 @@ public static class AuthProblems
     public static IResult Unauthorized(HttpContext ctx) =>
         Create(ctx, 401, "Unauthorized", "Authentication is required.");
 
-    public static IResult NotFound(HttpContext ctx, string? detail = null) =>
-        Create(ctx, 404, "Not Found", detail ?? "The requested stokvel was not found.");
+      public static IResult NotFound(HttpContext ctx, string? detail = null)
+    {
+        Refused(ctx, RefusalResult.NotFound);
+        return Create(ctx, 404, "Not Found", detail ?? "The requested stokvel was not found.");
+    }
 
-    public static IResult Forbidden(HttpContext ctx) =>
-        Create(ctx, 403, "Forbidden", "You do not have permission to perform this action.");
+    public static IResult Forbidden(HttpContext ctx)
+    {
+        Refused(ctx, RefusalResult.Forbidden);
+        return Create(ctx, 403, "Forbidden", "You do not have permission to perform this action.");
+    }
 
+    private static void Refused(HttpContext ctx, RefusalResult result)
+    {
+        RondiTrackTelemetry.AuthorizationRefused(result);
+    }
+    
     public static bool IsNotMember(AuthorizationFailure? failure) =>
         failure?.FailureReasons.Any(x => x.Message == StokvelAuthFailures.NotMember) == true;
 
