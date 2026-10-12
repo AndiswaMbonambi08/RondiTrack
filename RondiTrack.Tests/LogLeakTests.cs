@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using RondiTrack.Dtos;
 using RondiTrack.Tests.TestSupport;
 using Xunit;
+using RondiTrack.Tests.Integration;
 
 namespace RondiTrack.Tests;
 

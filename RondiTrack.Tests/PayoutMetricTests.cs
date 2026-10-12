@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using RondiTrack.Dtos;
 using RondiTrack.Tests.TestSupport;
+using RondiTrack.Tests.Integration;
 using Xunit;
 
 namespace RondiTrack.Tests;
