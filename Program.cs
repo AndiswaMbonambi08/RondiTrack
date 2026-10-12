@@ -5,6 +5,7 @@ using RondiTrack.Domain;
 using RondiTrack.Endpoints;
 using RondiTrack.ErrorHandling;
 using RondiTrack.Services;
+using RondiTrack.Telemetry;
 using Scalar.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
@@ -12,10 +13,45 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using StokvelMemberRole = RondiTrack.Persistence.Entities.StokvelMemberRole;
+using OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// [1] OpenTelemetry: traces, metrics and logs. The OTLP exporter is only added when
+// OTEL_EXPORTER_OTLP_ENDPOINT is set, so tests and CI never need a dashboard.
+var otel = builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("ronditrack-api"))
+    .WithTracing(t => t
+        .AddAspNetCoreInstrumentation(o =>
+            o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health"))
+        .AddSource("Npgsql")   // Npgsql's own ActivitySource: one span per SQL command
+        .AddSource(RondiTrackTelemetry.ActivitySourceName))
+    .WithMetrics(m => m.AddMeter(RondiTrackTelemetry.MeterName))
+    .WithLogging();
+
+if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+{
+    otel.UseOtlpExporter();
+}
+
+builder.Services.Configure<OpenTelemetryLoggerOptions>(o =>
+{
+    o.IncludeScopes = true;
+    o.IncludeFormattedMessage = true;
+});
+
+// Console lines carry the trace id too, so a log line can be matched to a response's correlationId.
+builder.Logging.Configure(o =>
+    o.ActivityTrackingOptions = ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId);
+builder.Logging.AddSimpleConsole(o => o.IncludeScopes = true);
 
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
 JwtOptions.EnsureValid(jwtOptions);
@@ -69,7 +105,12 @@ builder.Services.AddSingleton<ITokenService, TokenService>();
 
 
 builder.Services.AddOpenApi();
-builder.Services.AddProblemDetails();
+
+// [3] Every problem response carries correlationId = the request's W3C trace id.
+builder.Services.AddProblemDetails(o =>
+    o.CustomizeProblemDetails = ctx =>
+        ctx.ProblemDetails.Extensions["correlationId"] = CorrelationId.For(ctx.HttpContext));
+
 builder.Services.AddExceptionHandler<RondiTrackExceptionHandler>();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
@@ -84,6 +125,21 @@ builder.Services.AddDbContext<RondiTrackDbContext>(options =>
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(10),
             errorCodesToAdd: null)));
+
+// [7] Probes. Live runs no checks. Ready checks PostgreSQL with a capped timeout.
+// Health:ReadyTimeoutSeconds = 0 removes the cap (use it for the "before" timing).
+var readyTimeoutSeconds = builder.Configuration.GetValue("Health:ReadyTimeoutSeconds", 2);
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<RondiTrackDbContext>("postgres", HealthStatus.Unhealthy, ["ready"]);
+
+if (readyTimeoutSeconds > 0)
+{
+    builder.Services.Configure<HealthCheckServiceOptions>(o =>
+    {
+        foreach (var registration in o.Registrations)
+            registration.Timeout = TimeSpan.FromSeconds(readyTimeoutSeconds);
+    });
+}
 
 // Swapped to EF Core. Scoped because they depend on the Scoped DbContext.
 builder.Services.AddScoped<IStokvelRepository, EfStokvelRepository>();
@@ -108,6 +164,7 @@ var app = builder.Build();
 
 // after app is built, before MapControllers():
 app.UseExceptionHandler();
+app.UseStatusCodePages();   // [3] bare 401/403 become problem details with correlationId
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -115,13 +172,24 @@ app.UseAuthorization();
 // against the real database table and saves everything in one go. See
 // Data/SaveChangesMiddleware.cs for why this is needed instead of calling
 // SaveChangesAsync directly in the repository.
-app.UseMiddleware<SaveChangesMiddleware>();
+// [7] Skipped for /health so a probe never touches the database through this middleware.
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/health"),
+    branch => branch.UseMiddleware<SaveChangesMiddleware>());
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
     app.MapScalarApiReference().AllowAnonymous();
 }
+
+// [7] Anonymous, and they only ever return Healthy or Unhealthy.
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false })
+    .AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = r => r.Tags.Contains("ready")
+}).AllowAnonymous();
 
 app.MapUserEndpoints();
 app.MapAuthEndpoints();

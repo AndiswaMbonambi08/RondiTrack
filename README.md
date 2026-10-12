@@ -894,3 +894,89 @@ The new tests cover: no token returns 401 problem JSON; non-member 404, member w
 - **The idempotency store is in memory and keyed only by the `Idempotency-Key` header.** It is not scoped per user and does not survive a restart.
 - **The user repository is still in memory with a mirror to the database.** This was a stated decision from earlier weeks. `POST /api/users` creates a user with no password, and is now platform admin only.
 - **Deleting a stokvel leaves its cycles, and deleting a user leaves their memberships.** Both were already documented gaps.
+
+
+ Assignment 6.2: Observability & POPIA-compliant telemetry
+
+## Run the Aspire dashboard (laptop only, unsecured, never deploy it)
+docker run --rm -d --name aspire-dashboard -p 18888:18888 -p 4317:18889 -e ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true mcr.microsoft.com/dotnet/aspire-dashboard:latest
+$env:OTEL_EXPORTER_OTLP_ENDPOINT = “http://localhost:4317”
+dotnet run
+
+Open http://localhost:18888. Telemetry is exported only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, so tests and CI need no dashboard. Service name: `ronditrack-api`.
+
+## Payout trace
+![payout trace](docs/payout-trace.png)
+`payout.process` sits inside the request span, and the payout's SQL spans (Npgsql) are nested beneath it.
+
+## Span tags (`payout.process`)
+| Tag | Why it is safe | What support gains |
+|---|---|---|
+| `payout.cycle_id` | Random GUID; no amount, name, email or bank detail. It can be joined to the database, which is access-controlled. | Find the exact cycle that failed. |
+| `payout.outcome` | Fixed set: `success`, `failed`. | See at a glance whether a payout succeeded. |
+| `error.type` (failures only) | Exception type name only, never the message. | Tells support which failure class occurred without leaking values. |
+
+A failed payout sets the span status to Error.
+
+## Metrics and tags
+Meter `RondiTrack`: `ronditrack.contributions.recorded` (no tags), `ronditrack.payouts.processed`, and an authorization-refusals counter.
+
+| Metric | Tag | Values | Max distinct |
+|---|---|---|---|
+| contributions recorded | none | n/a | 1 |
+| payouts processed | outcome | success, failed | 2 |
+| authorization refusals | result | not_found, forbidden | 2 |
+
+No stokvel ID, user ID or amount is ever a tag.
+
+**Why "how many payouts did my stokvel process this year" is a database query:** answering it needs a per-stokvel tag, which is unbounded (one series per stokvel). Metrics are aggregates that reset on restart and are kept briefly. The database holds the exact, durable record and can filter by stokvel and date.
+
+## One correlation ID
+Every problem response (exception handler, 401, 403, and the 404 for non-members) carries `correlationId` equal to the W3C trace ID, and the caller's `traceparent` is honoured. The same ID appears in the log line (`CorrelationId: ...`) and the trace. Note: the commit "Use W3C trace id as correlationId..." failed with "no changes added" because that code had already landed in earlier commits, so there is no commit with that exact message.
+
+## EF command logging
+No `LogTo` and no `EnableSensitiveDataLogging`. Each SQL command is logged once, via the `Microsoft.EntityFrameworkCore.Database.Command` category: `Information` in Development, `Warning` in production. Production uses Warning because Npgsql spans already record every statement and its duration, so Information would duplicate them and store table and column names for months. Warning still logs failed and slow commands.
+
+## POPIA log audit
+| Location | Can contain | Personal/financial? | Level / change |
+|---|---|---|---|
+| Exception handler, 4xx | CorrelationId, method, path (GUIDs), status, exception **type** | GUIDs only; no exception message | Information; type only, message removed |
+| Exception handler, 5xx | Full exception | Messages could hold values | Error; client gets a generic detail plus correlationId |
+| Login succeeded | UserId, FamilyId | IDs only | Information |
+| Sign-in failed | reason code (`wrong_password`, `no_such_account`), UserId or null | Never the typed email | Information; email removed |
+| Refresh rotated | UserId, FamilyId | IDs only | Information |
+| Refresh token reuse | UserId, FamilyId | IDs only | **Warning**: possible token theft |
+| Authorization refused | result (`not_found`/`forbidden`), UserId, path with stokvel GUID | A user ID next to a stokvel ID shows membership attempts | Information; user ID only. Accepted because both are pseudonymous IDs. |
+| EF command log | SQL text; parameters print as `?` | Table/column names | Warning in production |
+
+Before/after for each changed line is in the git history (`git diff de3b4f3 HEAD -- Services ErrorHandling Authorization`).
+
+## Health probes
+`/health/live` runs no checks; `/health/ready` checks PostgreSQL. Both are anonymous and return only Healthy/Unhealthy.
+
+Readiness with the dev database stopped:
+- Before the cap (`Health:ReadyTimeoutSeconds=0`): **TotalSeconds
+------------
+   0.3402366**
+
+- After the cap (2 s): 
+**TotalSeconds
+------------
+   0.2812252**
+
+Explanation: I did enable retry-on-failure in Week 5 (5 retries, max delay 10 s), so without a cap a probe can wait through the whole retry schedule. The 2 s timeout makes the platform get a fast Unhealthy, and stops probes piling up behind slow connections. It also protects against a hanging network, where nothing refuses the connection.
+
+## Log excerpt (no personal or secret data)
+Login succeeded. UserId: 173708fa-0b3a-4654-a361-d30342fb2933, FamilyId: 5d6cca97-2637-4d7f-ad98-31b72825f416
+Executed DbCommand ... INSERT INTO “Payouts” ... VALUES (@p0, @p1, ...) (TraceId 95b199c01a4950eb0904410fb9d0643c)
+Authorization refused. Result: not_found, UserId: 5216d034-71a7-4aae-be61-9d547a1fed02
+
+
+## Tests
+With the dev database stopped: `Test summary: total: 59, failed: 0, succeeded: 59, skipped: 0, duration: 238.2s`. The tests cover probes, trace-id correlation on 401 and 404, the log-leak test (email, password, tokens and amount, plus no Error entry for the 409), and the payout metric.
+
+## Known gaps (not closed yet)
+- No sampling, no log retention policy, no alerting.
+- The app crashes at startup if the database is down (query at `Program.cs` line 209 exhausts retries).
+- `GET /api/stokvels` runs the same membership query about 20 times per request (N+1 from 6.1).
+- Aspire dashboard is unauthenticated: local use only.
