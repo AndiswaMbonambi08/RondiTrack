@@ -21,6 +21,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using StokvelMemberRole = RondiTrack.Persistence.Entities.StokvelMemberRole;
+using OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,7 +32,7 @@ var otel = builder.Services.AddOpenTelemetry()
     .WithTracing(t => t
         .AddAspNetCoreInstrumentation(o =>
             o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health"))
-        .AddNpgsql()
+        .AddSource("Npgsql")   // Npgsql's own ActivitySource: one span per SQL command
         .AddSource(RondiTrackTelemetry.ActivitySourceName))
     .WithMetrics(m => m.AddMeter(RondiTrackTelemetry.MeterName))
     .WithLogging();
@@ -104,7 +105,12 @@ builder.Services.AddSingleton<ITokenService, TokenService>();
 
 
 builder.Services.AddOpenApi();
-builder.Services.AddProblemDetails();
+
+// [3] Every problem response carries correlationId = the request's W3C trace id.
+builder.Services.AddProblemDetails(o =>
+    o.CustomizeProblemDetails = ctx =>
+        ctx.ProblemDetails.Extensions["correlationId"] = CorrelationId.For(ctx.HttpContext));
+
 builder.Services.AddExceptionHandler<RondiTrackExceptionHandler>();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
@@ -143,6 +149,7 @@ var app = builder.Build();
 
 // after app is built, before MapControllers():
 app.UseExceptionHandler();
+app.UseStatusCodePages();   // [3] bare 401/403 become problem details with correlationId
 app.UseAuthentication();
 app.UseAuthorization();
 

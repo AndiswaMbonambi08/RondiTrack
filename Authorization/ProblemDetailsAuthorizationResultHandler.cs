@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
+using RondiTrack.Telemetry;
 
 namespace RondiTrack.Authorization;
 
@@ -23,8 +24,7 @@ public static class AuthProblems
         Results.Problem(statusCode: status, title: title, detail: detail,
             extensions: new Dictionary<string, object?>
             {
-                // use the same source your RondiTrackExceptionHandler uses for correlationId
-                ["correlationId"] = ctx.TraceIdentifier
+                ["correlationId"] = CorrelationId.For(ctx)
             });
 }
 

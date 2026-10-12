@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RondiTrack.Domain.Exceptions;
+using RondiTrack.Telemetry;
 
 namespace RondiTrack.ErrorHandling;
 
@@ -17,7 +18,7 @@ public class RondiTrackExceptionHandler : IExceptionHandler
 
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        var correlationId = httpContext.TraceIdentifier;
+        var correlationId = CorrelationId.For(httpContext);
 
         // DbUpdateConcurrencyException derives from DbUpdateException, so it must be matched first.
         var (statusCode, title) = exception switch
