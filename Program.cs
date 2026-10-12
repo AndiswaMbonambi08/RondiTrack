@@ -5,6 +5,7 @@ using RondiTrack.Domain;
 using RondiTrack.Endpoints;
 using RondiTrack.ErrorHandling;
 using RondiTrack.Services;
+using RondiTrack.Telemetry;
 using Scalar.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
@@ -12,10 +13,44 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using StokvelMemberRole = RondiTrack.Persistence.Entities.StokvelMemberRole;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// [1] OpenTelemetry: traces, metrics and logs. The OTLP exporter is only added when
+// OTEL_EXPORTER_OTLP_ENDPOINT is set, so tests and CI never need a dashboard.
+var otel = builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("ronditrack-api"))
+    .WithTracing(t => t
+        .AddAspNetCoreInstrumentation(o =>
+            o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health"))
+        .AddNpgsql()
+        .AddSource(RondiTrackTelemetry.ActivitySourceName))
+    .WithMetrics(m => m.AddMeter(RondiTrackTelemetry.MeterName))
+    .WithLogging();
+
+if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+{
+    otel.UseOtlpExporter();
+}
+
+builder.Services.Configure<OpenTelemetryLoggerOptions>(o =>
+{
+    o.IncludeScopes = true;
+    o.IncludeFormattedMessage = true;
+});
+
+// Console lines carry the trace id too, so a log line can be matched to a response's correlationId.
+builder.Logging.Configure(o =>
+    o.ActivityTrackingOptions = ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId);
+builder.Logging.AddSimpleConsole(o => o.IncludeScopes = true);
 
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
 JwtOptions.EnsureValid(jwtOptions);
