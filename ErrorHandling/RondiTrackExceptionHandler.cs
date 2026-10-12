@@ -42,10 +42,21 @@ public class RondiTrackExceptionHandler : IExceptionHandler
             _ => exception.Message
         };
 
-        _logger.LogError(
-            exception,
-            "Request failed. CorrelationId: {CorrelationId}, Method: {Method}, Path: {Path}, StatusCode: {StatusCode}",
-            correlationId, httpContext.Request.Method, httpContext.Request.Path, statusCode);
+        if (statusCode >= StatusCodes.Status500InternalServerError)
+        {
+            // 5xx: our bug. Full exception so it can be debugged; the client only gets a generic detail.
+            _logger.LogError(
+                exception,
+                "Request failed. CorrelationId: {CorrelationId}, Method: {Method}, Path: {Path}, StatusCode: {StatusCode}",
+                correlationId, httpContext.Request.Method, httpContext.Request.Path, statusCode);
+        }
+        else
+        {
+            // 4xx: the caller's mistake. Exception type only, never the message: messages can carry names.
+            _logger.LogInformation(
+                "Request rejected. CorrelationId: {CorrelationId}, Method: {Method}, Path: {Path}, StatusCode: {StatusCode}, ExceptionType: {ExceptionType}",
+                correlationId, httpContext.Request.Method, httpContext.Request.Path, statusCode, exception.GetType().Name);
+        }
 
         var problemDetails = new ProblemDetails { Status = statusCode, Title = title, Detail = detail };
         problemDetails.Extensions["correlationId"] = correlationId;
