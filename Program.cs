@@ -126,6 +126,21 @@ builder.Services.AddDbContext<RondiTrackDbContext>(options =>
             maxRetryDelay: TimeSpan.FromSeconds(10),
             errorCodesToAdd: null)));
 
+// [7] Probes. Live runs no checks. Ready checks PostgreSQL with a capped timeout.
+// Health:ReadyTimeoutSeconds = 0 removes the cap (use it for the "before" timing).
+var readyTimeoutSeconds = builder.Configuration.GetValue("Health:ReadyTimeoutSeconds", 2);
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<RondiTrackDbContext>("postgres", HealthStatus.Unhealthy, ["ready"]);
+
+if (readyTimeoutSeconds > 0)
+{
+    builder.Services.Configure<HealthCheckServiceOptions>(o =>
+    {
+        foreach (var registration in o.Registrations)
+            registration.Timeout = TimeSpan.FromSeconds(readyTimeoutSeconds);
+    });
+}
+
 // Swapped to EF Core. Scoped because they depend on the Scoped DbContext.
 builder.Services.AddScoped<IStokvelRepository, EfStokvelRepository>();
 builder.Services.AddScoped<IContributionCycleRepository, EfContributionCycleRepository>();
@@ -157,13 +172,24 @@ app.UseAuthorization();
 // against the real database table and saves everything in one go. See
 // Data/SaveChangesMiddleware.cs for why this is needed instead of calling
 // SaveChangesAsync directly in the repository.
-app.UseMiddleware<SaveChangesMiddleware>();
+// [7] Skipped for /health so a probe never touches the database through this middleware.
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/health"),
+    branch => branch.UseMiddleware<SaveChangesMiddleware>());
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
     app.MapScalarApiReference().AllowAnonymous();
 }
+
+// [7] Anonymous, and they only ever return Healthy or Unhealthy.
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false })
+    .AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = r => r.Tags.Contains("ready")
+}).AllowAnonymous();
 
 app.MapUserEndpoints();
 app.MapAuthEndpoints();
