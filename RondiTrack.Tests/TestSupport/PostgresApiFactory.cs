@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using RondiTrack.Data;
@@ -25,8 +26,10 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     // with unchanged assertions: they create stokvels as a caller who is not a member.
     public static readonly Guid TestUserId = Guid.NewGuid();
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:17")
+    // Every log entry the app writes during the run, for the log-leak test.
+    public CapturingLoggerProvider Logs { get; } = new();
+
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17")
         .WithDatabase("ronditrack_test")
         .WithUsername("postgres")
         .WithPassword("postgres")
@@ -50,6 +53,7 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // connection string at startup, before the latter would apply.
         builder.UseSetting("ConnectionStrings:RondiTrack", _container.GetConnectionString());
         builder.UseSetting("Jwt:SigningKey", _signingKey);
+        builder.ConfigureLogging(logging => logging.AddProvider(Logs));
     }
 
     // Mints a valid access token directly, signed with this run's key. Faster than logging in,
