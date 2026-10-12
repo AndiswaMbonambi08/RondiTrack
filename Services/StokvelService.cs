@@ -4,6 +4,7 @@ using RondiTrack.Data;
 using RondiTrack.Domain.Exceptions;
 using RondiTrack.Dtos;
 using RondiTrack.Mapping;
+using RondiTrack.Telemetry;
 
 namespace RondiTrack.Services;
 
@@ -47,6 +48,7 @@ public class StokvelService : IStokvelService
             if (existing.Request != request)
                 throw new IdempotencyConflictException("This idempotency key was already used with a different request.");
 
+            // A replay is not a new contribution, so it is not counted.
             return existing.Response;
         }
 
@@ -62,12 +64,15 @@ public class StokvelService : IStokvelService
         if (cycle.StokvelId != stokvelId)
             throw new NotFoundException("That contribution cycle does not belong to this stokvel.");
 
-           await _stokvelRepo.LoadContributionsAsync(stokvel, cycle.Id);
+        await _stokvelRepo.LoadContributionsAsync(stokvel, cycle.Id);
         var contribution = stokvel.RecordContribution(user, cycle.Id, request.Amount);
         _stokvelRepo.AddContribution(contribution);
         var response = contribution.ToResponse();
 
         await _idempotencyStore.SaveAsync(idempotencyKey, new IdempotencyRecord(request, response));
+
+        // Counted once the domain accepted it. The row itself is saved by SaveChangesMiddleware afterwards.
+        RondiTrackTelemetry.ContributionRecorded();
 
         return response;
     }

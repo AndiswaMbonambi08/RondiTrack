@@ -44,6 +44,7 @@ public class PayoutService : IPayoutService
         {
             var response = await ProcessCoreAsync(stokvelId, contributionCycleId);
             activity?.SetTag("payout.outcome", "success");
+            RondiTrackTelemetry.PayoutProcessed(PayoutOutcome.Success);
             return response;
         }
         catch (Exception ex)
@@ -52,6 +53,7 @@ public class PayoutService : IPayoutService
             activity?.SetTag("error.type", ex.GetType().Name);
             // No description and no RecordException: exception messages can contain names.
             activity?.SetStatus(ActivityStatusCode.Error);
+            RondiTrackTelemetry.PayoutProcessed(PayoutOutcome.Failed);
             throw;
         }
     }
