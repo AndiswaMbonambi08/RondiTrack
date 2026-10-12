@@ -52,9 +52,19 @@ public class AuthService(
         // Always verify against *some* hash, so every failure path does the same work.
         var result = hasher.VerifyHashedPassword(user!, user?.PasswordHash ?? DummyHash.Value, request.Password);
 
-        // Unknown email, no password set, inactive account and wrong password all look identical.
+        // Unknown email, no password set, inactive account and wrong password all look identical to the caller.
         if (user is null || user.PasswordHash is null || !user.IsActive || result == PasswordVerificationResult.Failed)
+        {
+            var reason = user is null ? "no_such_account"
+                : user.PasswordHash is null ? "no_password_set"
+                : !user.IsActive ? "inactive"
+                : "wrong_password";
+
+            // Own user id only. The typed email is never logged; an unknown email has no id to log.
+            // Information, not Warning: a mistyped password is routine. Warning is kept for token reuse.
+            logger.LogInformation("Sign-in failed. Reason: {Reason}, UserId: {UserId}", reason, user?.Id);
             throw new InvalidCredentialsException();
+        }
 
         var familyId = Guid.NewGuid();   // a new login starts a new family
         var issued = await IssueAsync(user, familyId);
