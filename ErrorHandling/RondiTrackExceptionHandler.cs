@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using RondiTrack.Browser;
 using RondiTrack.Domain.Exceptions;
 using RondiTrack.Telemetry;
 
@@ -62,6 +63,11 @@ public class RondiTrackExceptionHandler : IExceptionHandler
         problemDetails.Extensions["correlationId"] = correlationId;
 
         httpContext.Response.StatusCode = statusCode;
+
+        // The exception middleware clears the response before calling this handler, which drops the
+        // CORS headers. Put them back so the browser lets the frontend read this error.
+        await FrontendCors.ReapplyAsync(httpContext);
+
         await httpContext.Response.WriteAsJsonAsync(
             problemDetails,
             options: (System.Text.Json.JsonSerializerOptions?)null,

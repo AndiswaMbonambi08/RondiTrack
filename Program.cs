@@ -1,5 +1,6 @@
 using FluentValidation;
 using RondiTrack.Authorization;
+using RondiTrack.Browser;
 using RondiTrack.Data;
 using RondiTrack.Domain;
 using RondiTrack.Endpoints;
@@ -28,23 +29,23 @@ var builder = WebApplication.CreateBuilder(args);
 // [1] OpenTelemetry: traces, metrics and logs. The OTLP exporter is only added when
 // OTEL_EXPORTER_OTLP_ENDPOINT is set, so tests and CI never need a dashboard.
 var otel = builder.Services.AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService("ronditrack-api")) //sets the service name the assignment required, so the dashboard shows ronditrack-api
+    .ConfigureResource(r => r.AddService("ronditrack-api")) // sets the service name the assignment required, so the dashboard shows ronditrack-api
     .WithTracing(t => t
         .AddAspNetCoreInstrumentation(o =>
             o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health"))
-        .AddSource("Npgsql")   //gives one span per SQL command
+        .AddSource("Npgsql")   // gives one span per SQL command
         .AddSource(RondiTrackTelemetry.ActivitySourceName))
-    .WithMetrics(m => m.AddMeter(RondiTrackTelemetry.MeterName)) 
+    .WithMetrics(m => m.AddMeter(RondiTrackTelemetry.MeterName))
     .WithLogging();
 
 if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
 {
-    otel.UseOtlpExporter(); //exports only when the variable is set. Tests and CI don’t set it, so they never need a dashboard
+    otel.UseOtlpExporter(); // exports only when the variable is set. Tests and CI don't set it, so they never need a dashboard
 }
 
 builder.Services.Configure<OpenTelemetryLoggerOptions>(o =>
 {
-    o.IncludeScopes = true;                 //added IncludeScopes and ActivityTrackingOptions, these put the TraceId and SpanId on console log lines, so I can match a log line to the correlationId in a response
+    o.IncludeScopes = true;                 // added IncludeScopes and ActivityTrackingOptions, these put the TraceId and SpanId on console log lines, so I can match a log line to the correlationId in a response
     o.IncludeFormattedMessage = true;
 });
 
@@ -106,15 +107,18 @@ builder.Services.AddSingleton<ITokenService, TokenService>();
 
 builder.Services.AddOpenApi();
 
+// CORS: one named policy for the browser frontend. Origins come from the Cors:AllowedOrigins config section.
+builder.Services.AddFrontendCors();
+
 // [3] Every problem response carries correlationId = the request's W3C trace id.
 builder.Services.AddProblemDetails(o =>
-    o.CustomizeProblemDetails = ctx =>            //CustomizeProblemDetails with CorrelationId, It adds the correlationId to the framework’s own problem responses
+    o.CustomizeProblemDetails = ctx =>            // adds the correlationId to the framework's own problem responses
         ctx.ProblemDetails.Extensions["correlationId"] = CorrelationId.For(ctx.HttpContext));
 
 builder.Services.AddExceptionHandler<RondiTrackExceptionHandler>();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
-// DbContext must be Scoped, never Singleton — one instance per request. A
+// DbContext must be Scoped, never Singleton: one instance per request. A
 // Singleton DbContext would be shared and mutated by every request at once,
 // with no isolation between them, and EF's change tracker would grow forever
 // without ever being cleared.
@@ -128,9 +132,9 @@ builder.Services.AddDbContext<RondiTrackDbContext>(options =>
 
 // [7] Probes. Live runs no checks. Ready checks PostgreSQL with a capped timeout.
 // Health:ReadyTimeoutSeconds = 0 removes the cap (use it for the "before" timing).
-var readyTimeoutSeconds = builder.Configuration.GetValue("Health:ReadyTimeoutSeconds", 2); //caps each check at Health:ReadyTimeoutSeconds, default 2
+var readyTimeoutSeconds = builder.Configuration.GetValue("Health:ReadyTimeoutSeconds", 2); // caps each check at Health:ReadyTimeoutSeconds, default 2
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<RondiTrackDbContext>("postgres", HealthStatus.Unhealthy, ["ready"]); //where Health checks happened
+    .AddDbContextCheck<RondiTrackDbContext>("postgres", HealthStatus.Unhealthy, ["ready"]); // where Health checks happened
 
 if (readyTimeoutSeconds > 0)
 {
@@ -151,7 +155,7 @@ builder.Services.AddScoped<ContributionQueryService>();
 builder.Services.AddScoped<MemberQueryService>();
 builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
 
-// Not swapped yet — a stated decision, not an oversight. See README.
+// Not swapped yet: a stated decision, not an oversight. See README.
 builder.Services.AddSingleton<InMemoryUserRepository>();
 builder.Services.AddScoped<IUserRepository, MirroringUserRepository>();
 builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
@@ -164,7 +168,8 @@ var app = builder.Build();
 
 // after app is built, before MapControllers():
 app.UseExceptionHandler();
-app.UseStatusCodePages();   // [3] bare 401/403 become problem details with correlationId
+app.UseStatusCodePages();               // [3] bare 401/403 become problem details with correlationId
+app.UseCors(FrontendCors.PolicyName);   // answers preflights itself, so it must run before any token check
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -188,7 +193,7 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => fa
     .AllowAnonymous();
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    Predicate = r => r.Tags.Contains("ready") //only run checks tagged ready
+    Predicate = r => r.Tags.Contains("ready") // only run checks tagged ready
 }).AllowAnonymous();
 
 app.MapUserEndpoints();
