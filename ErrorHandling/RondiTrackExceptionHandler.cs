@@ -20,11 +20,11 @@ public class RondiTrackExceptionHandler : IExceptionHandler
     {
         var correlationId = CorrelationId.For(httpContext);
 
-        // DbUpdateConcurrencyException derives from DbUpdateException, so it must be matched first.
+        // maps exception types to HTTP statuses
         var (statusCode, title) = exception switch
         {
             RondiTrackException rte => (rte.StatusCode, rte.Title),
-            DbUpdateConcurrencyException => (StatusCodes.Status412PreconditionFailed, "Precondition Failed"),
+            DbUpdateConcurrencyException => (StatusCodes.Status412PreconditionFailed, "Precondition Failed"), //DbUpdateConcurrencyException comes first because it derives from DbUpdateException
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } }
                 => (StatusCodes.Status409Conflict, "Conflict"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request"),
@@ -37,8 +37,8 @@ public class RondiTrackExceptionHandler : IExceptionHandler
                 => "The resource was changed by someone else since you read it. Fetch it again and retry.",
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } }
                 => "A record with the same values already exists.",
-            _ when statusCode == StatusCodes.Status500InternalServerError
-                => "An unexpected error occurred.",
+            _ when statusCode == StatusCodes.Status500InternalServerError          //Clients must never see internals. They get a generic message plus the correlationId, and I find the real exception in the logs
+                => "An unexpected error occurred.",            
             _ => exception.Message
         };
 

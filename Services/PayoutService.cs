@@ -33,16 +33,16 @@ public class PayoutService : IPayoutService
         _cycleRepo = cycleRepo;
         _payoutRepo = payoutRepo;
     }
-
-    public async Task<PayoutResponse> ProcessPayoutAsync(Guid stokvelId, Guid contributionCycleId)
+//ProcessPayoutAsync owns telemetry, the span, tags and metric
+    public async Task<PayoutResponse> ProcessPayoutAsync(Guid stokvelId, Guid contributionCycleId) //split ProcessPayoutAsync and ProcessCoreAsync
     {
         // Started before the first query, so every SQL span below nests under this one.
         using var activity = RondiTrackTelemetry.Source.StartActivity("payout.process");
-        activity?.SetTag("payout.cycle_id", contributionCycleId.ToString());
+        activity?.SetTag("payout.cycle_id", contributionCycleId.ToString()); //payout.cycle_id can be looked up in the database
 
         try
         {
-            var response = await ProcessCoreAsync(stokvelId, contributionCycleId);
+            var response = await ProcessCoreAsync(stokvelId, contributionCycleId); 
             activity?.SetTag("payout.outcome", "success");
             RondiTrackTelemetry.PayoutProcessed(PayoutOutcome.Success);
             return response;
@@ -57,11 +57,11 @@ public class PayoutService : IPayoutService
             throw;
         }
     }
-
+//ProcessCoreAsync holds keeps the logic readable and means there’s one place where success or failure is recorded
     private async Task<PayoutResponse> ProcessCoreAsync(Guid stokvelId, Guid contributionCycleId)
     {
         var stokvel = await _stokvelRepo.GetByIdAsync(stokvelId)
-            ?? throw new NotFoundException("Stokvel not found.");
+            ?? throw new NotFoundException("Stokvel not found."); //used throw, not throw ex because rethrows the same exception and keeps the stack trace
 
         var cycle = await _cycleRepo.GetByIdAsync(contributionCycleId)
             ?? throw new NotFoundException("Contribution cycle not found.");
@@ -94,7 +94,7 @@ public class PayoutService : IPayoutService
                 await _payoutRepo.AddAsync(payout);
                 await _db.SaveChangesAsync();
 
-                TestHookBeforeCycleUpdate?.Invoke();
+                TestHookBeforeCycleUpdate?.Invoke(); //TestHookBeforeCycleUpdate , a test to force a failure between the two writes and prove the rollback works
 
                 cycle.MarkPayoutProcessed();
                 await _db.SaveChangesAsync();
