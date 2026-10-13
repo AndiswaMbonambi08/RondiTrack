@@ -1,4 +1,4 @@
-﻿using RondiTrack.Tests.TestSupport;
+using RondiTrack.Tests.TestSupport;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -97,13 +97,13 @@ private async Task<Guid> SeedPayoutAsync()
     {
         var id = await SeedPayoutAsync();
 
-        var etag = (await _client.GetAsync($"/api/payouts/{id}")).Headers.ETag!.Tag;
+        var etag = (await _client.GetAsync($"/api/v1/payouts/{id}")).Headers.ETag!.Tag;
 
-        var first = new HttpRequestMessage(HttpMethod.Put, $"/api/payouts/{id}") { Content = JsonContent.Create(new { amount = 150m }) };
+        var first = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/payouts/{id}") { Content = JsonContent.Create(new { amount = 150m }) };
         first.Headers.TryAddWithoutValidation("If-Match", etag);
         Assert.Equal(HttpStatusCode.OK, (await _client.SendAsync(first)).StatusCode);
 
-        var stale = new HttpRequestMessage(HttpMethod.Put, $"/api/payouts/{id}") { Content = JsonContent.Create(new { amount = 175m }) };
+        var stale = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/payouts/{id}") { Content = JsonContent.Create(new { amount = 175m }) };
         stale.Headers.TryAddWithoutValidation("If-Match", etag);          // same token, now stale
         var res = await _client.SendAsync(stale);
 

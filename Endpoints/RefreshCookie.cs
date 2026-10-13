@@ -19,6 +19,6 @@ public static class RefreshCookie
         HttpOnly = true,                      // JavaScript can't read it, so an XSS bug can't steal it
         Secure = true,                        // only ever sent over HTTPS
         SameSite = SameSiteMode.Strict,       // never sent on cross-site requests
-        Path = "/api/auth"                    // only sent to the auth endpoints, not on every API call
+        Path = ApiRoutes.Auth                 // /api/v1/auth: only sent to the auth endpoints                   // only sent to the auth endpoints, not on every API call
     };
 }

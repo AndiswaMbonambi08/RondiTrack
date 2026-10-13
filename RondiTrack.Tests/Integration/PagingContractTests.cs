@@ -1,4 +1,4 @@
-﻿using RondiTrack.Tests.TestSupport;
+using RondiTrack.Tests.TestSupport;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -17,18 +17,18 @@ public class PagingContractTests
 
     private async Task<(Guid stokvelId, Guid cycleId)> SetupWithContributionsAsync(int count)
     {
-        var stokvel = (await (await _client.PostAsJsonAsync("/api/stokvels", new { name = "Paging Stokvel", contributionAmount = 100m }))
+        var stokvel = (await (await _client.PostAsJsonAsync("/api/v1/stokvels", new { name = "Paging Stokvel", contributionAmount = 100m }))
             .Content.ReadFromJsonAsync<StokvelResponse>(JsonOptions.CaseInsensitive))!;
-        var cycle = (await (await _client.PostAsJsonAsync("/api/contribution-cycles", new { stokvelId = stokvel.Id, label = "2026-09", targetAmount = 100m }))
+        var cycle = (await (await _client.PostAsJsonAsync("/api/v1/contribution-cycles", new { stokvelId = stokvel.Id, label = "2026-09", targetAmount = 100m }))
             .Content.ReadFromJsonAsync<ContributionCycleResponse>(JsonOptions.CaseInsensitive))!;
 
         for (var i = 0; i < count; i++)
         {
-            var user = (await (await _client.PostAsJsonAsync("/api/users", new { fullName = $"P{i}", email = $"{Guid.NewGuid()}@example.com" }))
+            var user = (await (await _client.PostAsJsonAsync("/api/v1/users", new { fullName = $"P{i}", email = $"{Guid.NewGuid()}@example.com" }))
                 .Content.ReadFromJsonAsync<UserResponse>(JsonOptions.CaseInsensitive))!;
-            (await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id })).EnsureSuccessStatusCode();
+            (await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id })).EnsureSuccessStatusCode();
 
-            var req = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvel.Id}/contributions")
+            var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
             { Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m }) };
             req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
             (await _client.SendAsync(req)).EnsureSuccessStatusCode();
@@ -37,7 +37,7 @@ public class PagingContractTests
     }
 
     private static string Url(Guid s, Guid c, string query = "") =>
-        $"/api/stokvels/{s}/cycles/{c}/contributions{query}";
+        $"/api/v1/stokvels/{s}/cycles/{c}/contributions{query}";
 
     [Fact]
     public async Task Paging_WalksEveryRowOnceAndEndsWithEmptyToken()

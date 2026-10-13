@@ -1,4 +1,4 @@
-// Maps every /api/stokvels route, including nested members and contributions,
+// Maps every /api/v1/stokvels route, including nested members and contributions,
 // annotated with OpenAPI summaries, descriptions, and every realistic response type.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +18,7 @@ public static class StokvelEndpoints
 {
     public static void MapStokvelEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/stokvels").WithTags("Stokvels");
+        var group = app.MapGroup(ApiRoutes.Stokvels).WithTags("Stokvels");
 
         // The one plain role check in the project: a platform-level operation.
         group.MapGet("/", async (IStokvelRepository repo) =>
@@ -53,7 +53,7 @@ public static class StokvelEndpoints
             }
 
             await repo.AddAsync(stokvel);
-            return Results.Created($"/api/stokvels/{stokvel.Id}", stokvel.ToResponse());
+            return Results.Created($"{ApiRoutes.Stokvels}/{stokvel.Id}", stokvel.ToResponse());
         })
         .WithSummary("Create a stokvel")
         .WithDescription("""
@@ -101,7 +101,7 @@ public static class StokvelEndpoints
         group.MapPost("/{id:guid}/members", async (Guid id, AddMemberRequest request, IStokvelService service) =>
         {
             var response = await service.AddMemberAsync(id, request.UserId);
-            return Results.Created($"/api/stokvels/{id}", response);
+            return Results.Created($"{ApiRoutes.Stokvels}/{id}", response);
         })
         .RequireAuthorization(Policies.StokvelAdmin)
         .WithSummary("Add a user as a stokvel member")
@@ -152,7 +152,7 @@ public static class StokvelEndpoints
                 throw new RequestValidationException("An Idempotency-Key header is required to record a contribution.");
 
             var response = await service.RecordContributionAsync(id, request, idempotencyKey);
-            return Results.Created($"/api/stokvels/{id}/contributions/{response.Id}", response);
+            return Results.Created($"{ApiRoutes.Stokvels}/{id}/contributions/{response.Id}", response);
         })
         .RequireAuthorization(Policies.StokvelMember)
         .WithSummary("Record a member's contribution for a cycle")

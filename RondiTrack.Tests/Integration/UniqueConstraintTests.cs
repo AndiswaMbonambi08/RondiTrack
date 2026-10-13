@@ -1,4 +1,4 @@
-﻿using RondiTrack.Tests.TestSupport;
+using RondiTrack.Tests.TestSupport;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -25,12 +25,12 @@ public class UniqueConstraintTests
     [Fact]
     public async Task DuplicateContribution_IsRejectedByTheDatabase_EvenWithoutTheServiceCheck()
     {
-        var user = (await (await _client.PostAsJsonAsync("/api/users", new { fullName = "U", email = $"{Guid.NewGuid()}@example.com" }))
+        var user = (await (await _client.PostAsJsonAsync("/api/v1/users", new { fullName = "U", email = $"{Guid.NewGuid()}@example.com" }))
             .Content.ReadFromJsonAsync<UserResponse>(JsonOptions.CaseInsensitive))!;
-        var stokvel = (await (await _client.PostAsJsonAsync("/api/stokvels", new { name = "Constraint Stokvel", contributionAmount = 100m }))
+        var stokvel = (await (await _client.PostAsJsonAsync("/api/v1/stokvels", new { name = "Constraint Stokvel", contributionAmount = 100m }))
             .Content.ReadFromJsonAsync<StokvelResponse>(JsonOptions.CaseInsensitive))!;
-        (await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id })).EnsureSuccessStatusCode();
-        var cycle = (await (await _client.PostAsJsonAsync("/api/contribution-cycles", new { stokvelId = stokvel.Id, label = "C1", targetAmount = 100m }))
+        (await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id })).EnsureSuccessStatusCode();
+        var cycle = (await (await _client.PostAsJsonAsync("/api/v1/contribution-cycles", new { stokvelId = stokvel.Id, label = "C1", targetAmount = 100m }))
             .Content.ReadFromJsonAsync<ContributionCycleResponse>(JsonOptions.CaseInsensitive))!;
 
         using var scope = _factory.Services.CreateScope();

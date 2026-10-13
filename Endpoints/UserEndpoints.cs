@@ -1,4 +1,4 @@
-// Maps every /api/users route, annotated with OpenAPI summaries, descriptions, and
+// Maps every /api/v1/users route, annotated with OpenAPI summaries, descriptions, and
 // every realistic response type so Scalar shows a complete contract.
 using RondiTrack.Data;
 using RondiTrack.Domain;
@@ -14,8 +14,8 @@ public static class UserEndpoints
 {
     public static void MapUserEndpoints(this WebApplication app)
     {
-            // Self or platform admin. List and create have no {id}, so they are platform admin only.
-            var group = app.MapGroup("/api/users").WithTags("Users")
+        // Self or platform admin. List and create have no {id}, so they are platform admin only.
+        var group = app.MapGroup(ApiRoutes.Users).WithTags("Users")
             .RequireAuthorization(Policies.SelfOrPlatformAdmin);
 
         group.MapGet("/", async (IUserRepository repo) =>
@@ -45,7 +45,7 @@ public static class UserEndpoints
         {
             var user = new User(request.FullName, request.Email);
             await repo.AddAsync(user);
-            return Results.Created($"/api/users/{user.Id}", user.ToResponse());
+            return Results.Created($"{ApiRoutes.Users}/{user.Id}", user.ToResponse());
         })
         .WithSummary("Create a user")
         .WithDescription("""

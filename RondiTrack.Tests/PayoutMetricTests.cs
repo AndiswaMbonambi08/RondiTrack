@@ -37,19 +37,19 @@ public class PayoutMetricTests(PostgresApiFactory factory)
 
         var client = factory.CreateClient();
 
-        var user = (await (await client.PostAsJsonAsync("/api/users",
+        var user = (await (await client.PostAsJsonAsync("/api/v1/users",
                 new { fullName = "Payout Metric", email = $"{Guid.NewGuid():N}@metric.example.com" }))
             .Content.ReadFromJsonAsync<UserResponse>(JsonOptions.CaseInsensitive))!;
-        var stokvel = (await (await client.PostAsJsonAsync("/api/stokvels",
+        var stokvel = (await (await client.PostAsJsonAsync("/api/v1/stokvels",
                 new { name = "Metric Stokvel", contributionAmount = 100m }))
             .Content.ReadFromJsonAsync<StokvelResponse>(JsonOptions.CaseInsensitive))!;
-        var add = await client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id });
+        var add = await client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
         Assert.True(add.IsSuccessStatusCode, "AddMember: " + (int)add.StatusCode);
-        var cycle = (await (await client.PostAsJsonAsync("/api/contribution-cycles",
+        var cycle = (await (await client.PostAsJsonAsync("/api/v1/contribution-cycles",
                 new { stokvelId = stokvel.Id, label = "2026-10", targetAmount = 100m }))
             .Content.ReadFromJsonAsync<ContributionCycleResponse>(JsonOptions.CaseInsensitive))!;
 
-        var url = $"/api/stokvels/{stokvel.Id}/cycles/{cycle.Id}/payout";
+        var url = $"/api/v1/stokvels/{stokvel.Id}/cycles/{cycle.Id}/payout";
 
         var first = await client.PostAsync(url, null);
         Assert.True(first.IsSuccessStatusCode, "Payout: " + (int)first.StatusCode + " " + await first.Content.ReadAsStringAsync());

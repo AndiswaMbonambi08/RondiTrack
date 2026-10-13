@@ -14,7 +14,7 @@ public static class PayoutVersionEndpoints
 
     public static void MapPayoutVersionEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/payouts/{id:guid}", async (Guid id, HttpContext http, StokvelAccess access,
+        app.MapGet(ApiRoutes.Payouts + "/{id:guid}", async (Guid id, HttpContext http, StokvelAccess access,
                                                     RondiTrackDbContext db, HttpResponse res, CancellationToken ct) =>
         {
             var payout = await db.Payouts.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct)
@@ -28,7 +28,7 @@ public static class PayoutVersionEndpoints
             return Results.Ok(payout.ToResponse());
         });
 
-        app.MapPut("/api/payouts/{id:guid}", async (Guid id, UpdatePayoutRequest body, HttpRequest req,
+        app.MapPut(ApiRoutes.Payouts + "/{id:guid}", async (Guid id, UpdatePayoutRequest body, HttpRequest req,
                                                     HttpResponse res, StokvelAccess access,
                                                     RondiTrackDbContext db, CancellationToken ct) =>
         {

@@ -1,4 +1,4 @@
-﻿using RondiTrack.Tests.TestSupport;
+using RondiTrack.Tests.TestSupport;
 // Integration tests through the real pipeline (validation, endpoint, exception handler).
 using System.Net;
 using System.Net.Http.Json;
@@ -21,7 +21,7 @@ public class UserEndpointsIntegrationTests
     [Fact]
     public async Task CreateUser_ValidRequest_Returns201WithUserResponse()
     {
-        var response = await _client.PostAsJsonAsync("/api/users", new { fullName = "Zanele Khumalo", email = "zanele@example.com" });
+        var response = await _client.PostAsJsonAsync("/api/v1/users", new { fullName = "Zanele Khumalo", email = "zanele@example.com" });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<UserResponse>(JsonOptions.CaseInsensitive);
@@ -32,7 +32,7 @@ public class UserEndpointsIntegrationTests
     [Fact]
     public async Task CreateUser_MissingFullName_Returns400ProblemJson()
     {
-        var response = await _client.PostAsJsonAsync("/api/users", new { fullName = "", email = "test@example.com" });
+        var response = await _client.PostAsJsonAsync("/api/v1/users", new { fullName = "", email = "test@example.com" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -41,7 +41,7 @@ public class UserEndpointsIntegrationTests
     [Fact]
     public async Task GetUser_UnknownId_Returns404ProblemJson()
     {
-        var response = await _client.GetAsync($"/api/users/{Guid.NewGuid()}");
+        var response = await _client.GetAsync($"/api/v1/users/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);

@@ -26,7 +26,7 @@ public class ObservabilityTests(PostgresApiFactory factory)
     {
         const string traceId = "0af7651916cd43dd8448eb211c80319c";
         var client = factory.CreateAnonymousClient();
-        using var request = WithTrace(HttpMethod.Get, "/api/stokvels", traceId);
+        using var request = WithTrace(HttpMethod.Get, "/api/v1/stokvels", traceId);
 
         var response = await client.SendAsync(request);
 
@@ -40,7 +40,7 @@ public class ObservabilityTests(PostgresApiFactory factory)
         const string traceId = "4bf92f3577b34da6a3ce929d0e0e4736";
         // Not a platform admin, and a member of nothing: the authorization handler answers 404.
         var outsider = factory.CreateClientFor(Guid.NewGuid());
-        using var request = WithTrace(HttpMethod.Get, $"/api/stokvels/{Guid.NewGuid()}/members", traceId);
+        using var request = WithTrace(HttpMethod.Get, $"/api/v1/stokvels/{Guid.NewGuid()}/members", traceId);
 
         var response = await outsider.SendAsync(request);
 

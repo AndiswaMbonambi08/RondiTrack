@@ -8,12 +8,12 @@ public static class AuthEndpoints
 {
     public static void MapAuthEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/auth").WithTags("Auth");
+        var group = app.MapGroup(ApiRoutes.Auth).WithTags("Auth");
 
         group.MapPost("/register", async (RegisterRequest request, IAuthService auth) =>
         {
             var user = await auth.RegisterAsync(request);
-            return Results.Created($"/api/users/{user.Id}", user);
+            return Results.Created($"{ApiRoutes.Users}/{user.Id}", user);
         })
         .AllowAnonymous()
         .WithSummary("Register a new account")
