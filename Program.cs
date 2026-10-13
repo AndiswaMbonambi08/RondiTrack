@@ -110,6 +110,9 @@ builder.Services.AddOpenApi();
 // CORS: one named policy for the browser frontend. Origins come from the Cors:AllowedOrigins config section.
 builder.Services.AddFrontendCors();
 
+// Rate limiting: named policies, limits read from the RateLimit config section.
+builder.Services.AddRateLimiting();
+
 // [3] Every problem response carries correlationId = the request's W3C trace id.
 builder.Services.AddProblemDetails(o =>
     o.CustomizeProblemDetails = ctx =>            // adds the correlationId to the framework's own problem responses
@@ -154,6 +157,8 @@ builder.Services.AddScoped<IStokvelMemberRepository, EfStokvelMemberRepository>(
 builder.Services.AddScoped<ContributionQueryService>();
 builder.Services.AddScoped<MemberQueryService>();
 builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<HomeQueryService>();
 
 // Not swapped yet: a stated decision, not an oversight. See README.
 builder.Services.AddSingleton<InMemoryUserRepository>();
@@ -171,6 +176,7 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();               // [3] bare 401/403 become problem details with correlationId
 app.UseCors(FrontendCors.PolicyName);   // answers preflights itself, so it must run before any token check
 app.UseAuthentication();
+app.UseRateLimiter();                   // after authentication (so money limits can use the user id), before authorization
 app.UseAuthorization();
 
 // Runs after every request; reconciles Stokvel's in-memory member list
@@ -203,6 +209,7 @@ app.MapContributionCycleEndpoints();
 app.MapPayoutEndpoints();
 app.MapPagedListEndpoints();
 app.MapPayoutVersionEndpoints();
+app.MapMeEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {

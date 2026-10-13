@@ -1,3 +1,4 @@
+using RondiTrack.Browser;
 using RondiTrack.Dtos;
 using RondiTrack.Services;
 using RondiTrack.Validation;
@@ -31,11 +32,13 @@ public static class AuthEndpoints
             return Results.Ok(result.Response);   // the body never contains the refresh token
         })
         .AllowAnonymous()
+        .RequireRateLimiting(RateLimiting.LoginPolicy)   // per-IP fixed window; 429 + Retry-After when exceeded
         .WithSummary("Sign in")
-        .WithDescription("Returns a short-lived access token and sets the refresh token as an HttpOnly cookie. An unknown email and a wrong password return the same 401.")
+        .WithDescription("Returns a short-lived access token and sets the refresh token as an HttpOnly cookie. An unknown email and a wrong password return the same 401. Too many attempts from one IP return 429 with Retry-After.")
         .Produces<LoginResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status429TooManyRequests)
         .AddEndpointFilter<ValidationFilter<LoginRequest>>();
 
         group.MapPost("/refresh", async (HttpContext http, IAuthService auth) =>

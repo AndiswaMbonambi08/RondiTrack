@@ -3,6 +3,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RondiTrack.Authorization;
+using RondiTrack.Browser;
 using RondiTrack.Data;
 using RondiTrack.Domain;
 using RondiTrack.Domain.Exceptions;
@@ -151,15 +152,25 @@ public static class StokvelEndpoints
             if (string.IsNullOrWhiteSpace(idempotencyKey))
                 throw new RequestValidationException("An Idempotency-Key header is required to record a contribution.");
 
-            var response = await service.RecordContributionAsync(id, request, idempotencyKey);
+            // The key is scoped to the signed-in caller, so two users can pick the same key safely.
+            var callerId = http.User.GetUserId() ?? request.UserId;
+            var (response, replayed) = await service.RecordContributionWithReplayAsync(callerId, id, request, idempotencyKey);
+
+            if (replayed)
+                http.Response.Headers["Idempotency-Replayed"] = "true";
+
             return Results.Created($"{ApiRoutes.Stokvels}/{id}/contributions/{response.Id}", response);
         })
         .RequireAuthorization(Policies.StokvelMember)
+        .RequireRateLimiting(RateLimiting.RecordContributionPolicy)   // token bucket per signed-in user
         .WithSummary("Record a member's contribution for a cycle")
         .WithDescription("""
             Members may record their own contribution. Treasurer or Admin may record anyone's (403 otherwise).
-            Requires an Idempotency-Key header. Repeating the same key with the same body returns the
-            original response unchanged. Repeating the same key with a different body returns 422.
+            Requires an Idempotency-Key header, scoped to the caller and the stokvel. Repeating the same key
+            with the same body returns the original response unchanged, with an Idempotency-Replayed: true
+            header. Repeating the same key with a different body returns 422.
+            Rate limited per user (429 with Retry-After). A 429 never consumes the key, so retry with the
+            same key after the wait.
             Fails 404 if the stokvel, user, or contribution cycle does not exist, or if the cycle belongs
             to a different stokvel. Fails 409 if the user is not a member, or has already contributed for
             this cycle.
@@ -172,6 +183,7 @@ public static class StokvelEndpoints
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+        .ProducesProblem(StatusCodes.Status429TooManyRequests)
         .AddEndpointFilter<ValidationFilter<RecordContributionRequest>>();
     }
 }

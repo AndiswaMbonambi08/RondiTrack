@@ -53,6 +53,16 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // connection string at startup, before the latter would apply.
         builder.UseSetting("ConnectionStrings:RondiTrack", _container.GetConnectionString());
         builder.UseSetting("Jwt:SigningKey", _signingKey);
+
+        // The TestServer gives every request a null RemoteIpAddress, so tests share rate-limit partitions.
+        // Very high defaults keep existing tests passing with unchanged assertions. Rate-limit tests
+        // override these with WithWebHostBuilder, which also gives them a fresh limiter.
+        builder.UseSetting("RateLimit:Login:PermitLimit", "100000");
+        builder.UseSetting("RateLimit:RecordContribution:TokenLimit", "100000");
+        builder.UseSetting("RateLimit:RecordContribution:TokensPerPeriod", "100000");
+        builder.UseSetting("RateLimit:ProcessPayout:TokenLimit", "100000");
+        builder.UseSetting("RateLimit:ProcessPayout:TokensPerPeriod", "100000");
+
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
     }
 

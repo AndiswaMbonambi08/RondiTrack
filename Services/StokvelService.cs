@@ -42,14 +42,24 @@ public class StokvelService : IStokvelService
 
     public async Task<ContributionResponse> RecordContributionAsync(Guid stokvelId, RecordContributionRequest request, string idempotencyKey)
     {
-        var existing = await _idempotencyStore.GetAsync(idempotencyKey);
+        var (response, _) = await RecordContributionWithReplayAsync(request.UserId, stokvelId, request, idempotencyKey);
+        return response;
+    }
+
+    public async Task<(ContributionResponse Response, bool Replayed)> RecordContributionWithReplayAsync(
+        Guid callerId, Guid stokvelId, RecordContributionRequest request, string idempotencyKey)
+    {
+        // Scoped so two users (or two stokvels) that pick the same key never collide.
+        var storeKey = $"{callerId}:{stokvelId}:{idempotencyKey}";
+
+        var existing = await _idempotencyStore.GetAsync(storeKey);
         if (existing is not null)
         {
             if (existing.Request != request)
                 throw new IdempotencyConflictException("This idempotency key was already used with a different request.");
 
             // A replay is not a new contribution, so it is not counted.
-            return existing.Response;
+            return (existing.Response, true);
         }
 
         var stokvel = await _stokvelRepo.GetByIdAsync(stokvelId)
@@ -69,11 +79,13 @@ public class StokvelService : IStokvelService
         _stokvelRepo.AddContribution(contribution);
         var response = contribution.ToResponse();
 
-        await _idempotencyStore.SaveAsync(idempotencyKey, new IdempotencyRecord(request, response));
+        // Only reached once the domain accepted the contribution. A request the rate limiter
+        // rejected never gets here, so a 429 can never consume a key.
+        await _idempotencyStore.SaveAsync(storeKey, new IdempotencyRecord(request, response));
 
         // Counted once the domain accepted it. The row itself is saved by SaveChangesMiddleware afterwards.
         RondiTrackTelemetry.ContributionRecorded();
 
-        return response;
+        return (response, false);
     }
 }
