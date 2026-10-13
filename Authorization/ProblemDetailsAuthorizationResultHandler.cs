@@ -4,9 +4,7 @@ using RondiTrack.Telemetry;
 
 namespace RondiTrack.Authorization;
 
-// One place that builds the 401, 403 and 404 problem responses, so the pipeline and the endpoints
-// that run their own checks return exactly the same shape.
-public static class AuthProblems
+public static class AuthProblems //static class , the pipeline handler and the endpoints that do their own checks (StokvelAccess.cs) return exactly the same shape
 {
     public static IResult Unauthorized(HttpContext ctx) =>
         Create(ctx, 401, "Unauthorized", "Authentication is required.");
@@ -27,9 +25,10 @@ public static class AuthProblems
     {
         RondiTrackTelemetry.AuthorizationRefused(result);
 
-        // Own user id only (the "sub" claim). Never the stokvel name, email or request body.
-        // Information, not Warning: a stale link or a member trying a higher-role action is routine,
-        // and a spike shows up in the refusals metric. Warning stays reserved for token reuse.
+        // Never log the stokvel name, the email, or what they sent in the request. Those could identify someone or reveal money details.
+        // A refusal is normal. For example, someone clicks an old link, or a member tries something only a treasurer can do. These aren’t emergencies
+        // If refusals suddenly increase, the refusals metric will show it, so we don’t need loud Warning logs
+    
         ctx.RequestServices.GetRequiredService<ILoggerFactory>()
             .CreateLogger("RondiTrack.Authorization")
             .LogInformation(
@@ -64,17 +63,17 @@ public sealed class ProblemDetailsAuthorizationResultHandler : IAuthorizationMid
         if (authorizeResult.Challenged)
         {
             context.Response.Headers.Append("WWW-Authenticate", "Bearer");
-            result = AuthProblems.Unauthorized(context);
+            result = AuthProblems.Unauthorized(context); //401 response is empty
         }
         else if (AuthProblems.IsNotMember(authorizeResult.AuthorizationFailure))
         {
-            result = AuthProblems.NotFound(context);
+            result = AuthProblems.NotFound(context); //404 response is empty
         }
         else
         {
-            result = AuthProblems.Forbidden(context);
+            result = AuthProblems.Forbidden(context); //403 response is empty
         }
 
-        await result.ExecuteAsync(context);
+        await result.ExecuteAsync(context); //the default handler would just set the status code, no body
     }
 }

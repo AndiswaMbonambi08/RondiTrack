@@ -44,7 +44,7 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOIN
 
 builder.Services.Configure<OpenTelemetryLoggerOptions>(o =>
 {
-    o.IncludeScopes = true;                 //added IncludeScopes and ActivityTrackingOptions, hese put the TraceId and SpanId on console log lines, so I can match a log line to the correlationId in a response
+    o.IncludeScopes = true;                 //added IncludeScopes and ActivityTrackingOptions, these put the TraceId and SpanId on console log lines, so I can match a log line to the correlationId in a response
     o.IncludeFormattedMessage = true;
 });
 
