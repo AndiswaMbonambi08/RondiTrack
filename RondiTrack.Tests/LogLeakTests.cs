@@ -29,18 +29,18 @@ public class LogLeakTests(PostgresApiFactory factory)
         anon.DefaultRequestHeaders.Authorization = null;
 
         // 1. register
-        var register = await anon.PostAsJsonAsync("/api/auth/register", new { fullName, email, password });
+        var register = await anon.PostAsJsonAsync("/api/v1/auth/register", new { fullName, email, password });
         Assert.Equal(HttpStatusCode.Created, register.StatusCode);
         var user = (await register.Content.ReadFromJsonAsync<UserResponse>(JsonOptions.CaseInsensitive))!;
 
         // 2. log in
-        var login = await anon.PostAsJsonAsync("/api/auth/login", new { email, password });
+        var login = await anon.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         var firstAccess = (await login.Content.ReadFromJsonAsync<LoginResponse>(JsonOptions.CaseInsensitive))!.AccessToken;
         var firstCookie = CookiePair(login);
 
         // 3. refresh, sending the cookie from the login
-        using var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        using var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh");
         refreshRequest.Headers.Add("Cookie", firstCookie);
         var refresh = await anon.SendAsync(refreshRequest);
         Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
@@ -49,18 +49,18 @@ public class LogLeakTests(PostgresApiFactory factory)
 
         // 4. record a contribution with a distinctive amount (setup runs as the platform-admin test user)
         var admin = factory.CreateClient();
-        var stokvel = (await (await admin.PostAsJsonAsync("/api/stokvels",
+        var stokvel = (await (await admin.PostAsJsonAsync("/api/v1/stokvels",
                 new { name = stokvelName, contributionAmount = amount }))
             .Content.ReadFromJsonAsync<StokvelResponse>(JsonOptions.CaseInsensitive))!;
 
-        var add = await admin.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id });
+        var add = await admin.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
         Assert.True(add.IsSuccessStatusCode, "AddMember: " + (int)add.StatusCode);
 
-        var cycle = (await (await admin.PostAsJsonAsync("/api/contribution-cycles",
+        var cycle = (await (await admin.PostAsJsonAsync("/api/v1/contribution-cycles",
                 new { stokvelId = stokvel.Id, label = "2026-10", targetAmount = amount }))
             .Content.ReadFromJsonAsync<ContributionCycleResponse>(JsonOptions.CaseInsensitive))!;
 
-        using var contribution = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvel.Id}/contributions")
+        using var contribution = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
         {
             Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount })
         };
@@ -71,7 +71,7 @@ public class LogLeakTests(PostgresApiFactory factory)
 
         // 5. duplicate registration: a 409 is the caller's mistake, never an Error
         var beforeDuplicate = factory.Logs.Entries.Count;
-        var duplicate = await anon.PostAsJsonAsync("/api/auth/register", new { fullName, email, password });
+        var duplicate = await anon.PostAsJsonAsync("/api/v1/auth/register", new { fullName, email, password });
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
 
         var duplicateLogs = factory.Logs.Entries.Skip(beforeDuplicate).ToList();

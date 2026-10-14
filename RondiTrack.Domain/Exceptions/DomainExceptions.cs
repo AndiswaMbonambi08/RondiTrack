@@ -20,7 +20,14 @@ public class RequestValidationException : RondiTrackException
     public override int StatusCode => 400;
     public override string Title => "Bad Request";
 
-    public RequestValidationException(string message) : base(message) { }
+    // Field name (camelCase) -> messages. Empty for non-field failures such as a missing header.
+    public IReadOnlyDictionary<string, string[]> Errors { get; }
+
+    public RequestValidationException(string message) : base(message)
+        => Errors = new Dictionary<string, string[]>();
+
+    public RequestValidationException(string message, IReadOnlyDictionary<string, string[]> errors) : base(message)
+        => Errors = errors;
 }
 
 // The thing the caller asked for doesn't exist.

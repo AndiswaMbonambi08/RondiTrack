@@ -24,14 +24,14 @@ public class AuthFlowTests
     private async Task<string> RegisterAsync()
     {
         var email = $"{Guid.NewGuid():N}@test.example";
-        var res = await _factory.CreateAnonymousClient().PostAsJsonAsync("/api/auth/register",
+        var res = await _factory.CreateAnonymousClient().PostAsJsonAsync("/api/v1/auth/register",
             new { fullName = "Auth Test", email, password = Password });
         res.EnsureSuccessStatusCode();
         return email;
     }
 
     private static Task<HttpResponseMessage> LoginAsync(HttpClient client, string email, string password) =>
-        client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        client.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
 
     private static string? ExtractRefreshToken(HttpResponseMessage res)
     {
@@ -82,7 +82,7 @@ public class AuthFlowTests
         Assert.Contains("httponly", setCookie);
         Assert.Contains("secure", setCookie);
         Assert.Contains("samesite=strict", setCookie);
-        Assert.Contains("path=/api/auth", setCookie);
+        Assert.Contains("path=/api/v1/auth", setCookie);
 
         var body = await res.Content.ReadAsStringAsync();
         Assert.DoesNotContain(token!, body);
@@ -114,7 +114,7 @@ public class AuthFlowTests
         var client = _factory.CreateAnonymousClient();
         var first = await LoginAndGetTokenAsync(client);
 
-        var refreshed = await PostWithCookieAsync(client, "/api/auth/refresh", first);
+        var refreshed = await PostWithCookieAsync(client, "/api/v1/auth/refresh", first);
 
         Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
         var second = ExtractRefreshToken(refreshed);
@@ -124,7 +124,7 @@ public class AuthFlowTests
         var body = await refreshed.Content.ReadAsStringAsync();
         Assert.DoesNotContain(second!, body);
 
-        var again = await PostWithCookieAsync(client, "/api/auth/refresh", second);
+        var again = await PostWithCookieAsync(client, "/api/v1/auth/refresh", second);
         Assert.Equal(HttpStatusCode.OK, again.StatusCode);
     }
 
@@ -134,23 +134,23 @@ public class AuthFlowTests
         var client = _factory.CreateAnonymousClient();
         var first = await LoginAndGetTokenAsync(client);
 
-        var rotated = await PostWithCookieAsync(client, "/api/auth/refresh", first);
+        var rotated = await PostWithCookieAsync(client, "/api/v1/auth/refresh", first);
         Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
         var second = ExtractRefreshToken(rotated);
 
-        var replay = await PostWithCookieAsync(client, "/api/auth/refresh", first);
+        var replay = await PostWithCookieAsync(client, "/api/v1/auth/refresh", first);
         Assert.Equal(HttpStatusCode.Unauthorized, replay.StatusCode);
         Assert.Equal("application/problem+json", replay.Content.Headers.ContentType?.MediaType);
 
         // Reuse detection revoked the whole family, so the newer token is dead too.
-        var newer = await PostWithCookieAsync(client, "/api/auth/refresh", second);
+        var newer = await PostWithCookieAsync(client, "/api/v1/auth/refresh", second);
         Assert.Equal(HttpStatusCode.Unauthorized, newer.StatusCode);
     }
 
     [Fact]
     public async Task Refresh_WithNoCookie_Returns401()
     {
-        var res = await PostWithCookieAsync(_factory.CreateAnonymousClient(), "/api/auth/refresh", null);
+        var res = await PostWithCookieAsync(_factory.CreateAnonymousClient(), "/api/v1/auth/refresh", null);
 
         Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
         Assert.Equal("application/problem+json", res.Content.Headers.ContentType?.MediaType);
@@ -164,10 +164,10 @@ public class AuthFlowTests
         var client = _factory.CreateAnonymousClient();
         var token = await LoginAndGetTokenAsync(client);
 
-        var logout = await PostWithCookieAsync(client, "/api/auth/logout", token);
+        var logout = await PostWithCookieAsync(client, "/api/v1/auth/logout", token);
         Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
 
-        var refresh = await PostWithCookieAsync(client, "/api/auth/refresh", token);
+        var refresh = await PostWithCookieAsync(client, "/api/v1/auth/refresh", token);
         Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
     }
 
@@ -177,12 +177,47 @@ public class AuthFlowTests
         var client = _factory.CreateAnonymousClient();
         var token = await LoginAndGetTokenAsync(client);
 
-        var first = await PostWithCookieAsync(client, "/api/auth/logout", token);
-        var second = await PostWithCookieAsync(client, "/api/auth/logout", token);
-        var noCookie = await PostWithCookieAsync(client, "/api/auth/logout", null);
+        var first = await PostWithCookieAsync(client, "/api/v1/auth/logout", token);
+        var second = await PostWithCookieAsync(client, "/api/v1/auth/logout", token);
+        var noCookie = await PostWithCookieAsync(client, "/api/v1/auth/logout", null);
 
         Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, second.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, noCookie.StatusCode);
+    }
+
+    // ---- versioned path (new for 6.3) ---------------------------------------------------
+
+    [Fact]
+    public async Task Refresh_AtVersionedPath_Succeeds_AndCookieStaysScopedToVersionedPath()
+    {
+        var client = _factory.CreateAnonymousClient();
+        var first = await LoginAndGetTokenAsync(client);
+
+        var refreshed = await PostWithCookieAsync(client, "/api/v1/auth/refresh", first);
+
+        Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
+        var second = ExtractRefreshToken(refreshed);
+        Assert.False(string.IsNullOrEmpty(second));
+
+        // The rotated cookie must keep the moved Path, or the browser would stop sending it.
+        var setCookie = string.Join(";", refreshed.Headers.GetValues("Set-Cookie")).ToLowerInvariant();
+        Assert.Matches(@"path=/api/v1/auth(;|$)", setCookie);
+    }
+
+    [Fact]
+    public async Task Refresh_AtOldUnversionedPath_IsNotServed()
+    {
+        var client = _factory.CreateAnonymousClient();
+        var token = await LoginAndGetTokenAsync(client);
+
+        var res = await PostWithCookieAsync(client, "/api/auth/refresh", token);
+
+        // No route matches the old path. Depending on the fallback authorization policy an anonymous
+        // caller sees 404 (no route) or 401 (policy runs first). Either way the old path must not refresh.
+        Assert.True(
+            res.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized,
+            $"Expected 404 or 401 but got {(int)res.StatusCode}.");
+        Assert.False(res.Headers.Contains("Set-Cookie"));
     }
 }

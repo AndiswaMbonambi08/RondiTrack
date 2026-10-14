@@ -29,21 +29,21 @@ public class StokvelAuthorizationTests
     private async Task<Guid> CreateUserAsync()
     {
         var email = $"{Guid.NewGuid():N}@test.example";
-        var res = await _admin.PostAsJsonAsync("/api/users", new { fullName = "Test User", email });
+        var res = await _admin.PostAsJsonAsync("/api/v1/users", new { fullName = "Test User", email });
         res.EnsureSuccessStatusCode();
         return (await res.Content.ReadFromJsonAsync<UserResponse>())!.Id;
     }
 
     private async Task<Guid> CreateStokvelAsync()
     {
-        var res = await _admin.PostAsJsonAsync("/api/stokvels", new { name = "Test Stokvel", contributionAmount = 500 });
+        var res = await _admin.PostAsJsonAsync("/api/v1/stokvels", new { name = "Test Stokvel", contributionAmount = 500 });
         res.EnsureSuccessStatusCode();
         return (await res.Content.ReadFromJsonAsync<StokvelResponse>())!.Id;
     }
 
     private async Task AddMemberAsync(Guid stokvelId, Guid userId, StokvelMemberRole role = StokvelMemberRole.Member)
     {
-        var res = await _admin.PostAsJsonAsync($"/api/stokvels/{stokvelId}/members", new { userId });
+        var res = await _admin.PostAsJsonAsync($"/api/v1/stokvels/{stokvelId}/members", new { userId });
         res.EnsureSuccessStatusCode();
 
         if (role == StokvelMemberRole.Member) return;
@@ -58,7 +58,7 @@ public class StokvelAuthorizationTests
 
     private async Task<Guid> CreateCycleAsync(Guid stokvelId)
     {
-        var res = await _admin.PostAsJsonAsync("/api/contribution-cycles",
+        var res = await _admin.PostAsJsonAsync("/api/v1/contribution-cycles",
             new { stokvelId, label = "2026-10", targetAmount = 500 });
         res.EnsureSuccessStatusCode();
         return (await res.Content.ReadFromJsonAsync<ContributionCycleResponse>())!.Id;
@@ -67,7 +67,7 @@ public class StokvelAuthorizationTests
     private static async Task<HttpResponseMessage> RecordContributionAsync(
         HttpClient client, Guid stokvelId, Guid cycleId, Guid userId)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvelId}/contributions")
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvelId}/contributions")
         {
             Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amount = 500 })
         };
@@ -95,7 +95,7 @@ public class StokvelAuthorizationTests
     }
 
     private static string PayoutUrl(Scenario s) =>
-        $"/api/stokvels/{s.StokvelId}/cycles/{s.CycleId}/payout";
+        $"/api/v1/stokvels/{s.StokvelId}/cycles/{s.CycleId}/payout";
 
     // ---- 401 -----------------------------------------------------------------------------
 
@@ -104,7 +104,7 @@ public class StokvelAuthorizationTests
     {
         var client = _factory.CreateAnonymousClient();
 
-        var res = await client.GetAsync($"/api/stokvels/{Guid.NewGuid()}/members");
+        var res = await client.GetAsync($"/api/v1/stokvels/{Guid.NewGuid()}/members");
 
         Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
         Assert.Equal("application/problem+json", res.Content.Headers.ContentType?.MediaType);
@@ -192,8 +192,8 @@ public class StokvelAuthorizationTests
     {
         var userId = await CreateUserAsync();
 
-        var ordinary = await _factory.CreateClientFor(userId).GetAsync("/api/stokvels");
-        var admin = await _admin.GetAsync("/api/stokvels");
+        var ordinary = await _factory.CreateClientFor(userId).GetAsync("/api/v1/stokvels");
+        var admin = await _admin.GetAsync("/api/v1/stokvels");
 
         Assert.Equal(HttpStatusCode.Forbidden, ordinary.StatusCode);
         Assert.Equal(HttpStatusCode.OK, admin.StatusCode);

@@ -1,4 +1,4 @@
-﻿using RondiTrack.Tests.TestSupport;
+using RondiTrack.Tests.TestSupport;
 // Integration tests for ContributionCycle CRUD and contribution recording.
 using System.Net;
 using System.Net.Http.Json;
@@ -19,15 +19,15 @@ public class ContributionCycleAndContributionTests
     }
 
     private async Task<UserResponse> CreateUserAsync() =>
-        (await (await _client.PostAsJsonAsync("/api/users", new { fullName = "Test User", email = $"{Guid.NewGuid()}@example.com" }))
+        (await (await _client.PostAsJsonAsync("/api/v1/users", new { fullName = "Test User", email = $"{Guid.NewGuid()}@example.com" }))
             .Content.ReadFromJsonAsync<UserResponse>(JsonOptions.CaseInsensitive))!;
 
     private async Task<StokvelResponse> CreateStokvelAsync() =>
-        (await (await _client.PostAsJsonAsync("/api/stokvels", new { name = "Test Stokvel", contributionAmount = 100m }))
+        (await (await _client.PostAsJsonAsync("/api/v1/stokvels", new { name = "Test Stokvel", contributionAmount = 100m }))
             .Content.ReadFromJsonAsync<StokvelResponse>(JsonOptions.CaseInsensitive))!;
 
     private async Task<ContributionCycleResponse> CreateCycleAsync(Guid stokvelId, string label = "2026-09") =>
-        (await (await _client.PostAsJsonAsync("/api/contribution-cycles", new { stokvelId, label, targetAmount = 100m }))
+        (await (await _client.PostAsJsonAsync("/api/v1/contribution-cycles", new { stokvelId, label, targetAmount = 100m }))
             .Content.ReadFromJsonAsync<ContributionCycleResponse>(JsonOptions.CaseInsensitive))!;
 
     [Fact]
@@ -35,7 +35,7 @@ public class ContributionCycleAndContributionTests
     {
         var stokvel = await CreateStokvelAsync();
 
-        var response = await _client.PostAsJsonAsync("/api/contribution-cycles", new { stokvelId = stokvel.Id, label = "2026-09", targetAmount = 100m });
+        var response = await _client.PostAsJsonAsync("/api/v1/contribution-cycles", new { stokvelId = stokvel.Id, label = "2026-09", targetAmount = 100m });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -45,7 +45,7 @@ public class ContributionCycleAndContributionTests
     {
         var stokvel = await CreateStokvelAsync();
 
-        var response = await _client.PostAsJsonAsync("/api/contribution-cycles", new { stokvelId = stokvel.Id, label = "2026-09", targetAmount = 0m });
+        var response = await _client.PostAsJsonAsync("/api/v1/contribution-cycles", new { stokvelId = stokvel.Id, label = "2026-09", targetAmount = 0m });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -53,7 +53,7 @@ public class ContributionCycleAndContributionTests
     [Fact]
     public async Task CreateContributionCycle_NonexistentStokvel_Returns404ProblemJson()
     {
-        var response = await _client.PostAsJsonAsync("/api/contribution-cycles", new { stokvelId = Guid.NewGuid(), label = "2026-09", targetAmount = 100m });
+        var response = await _client.PostAsJsonAsync("/api/v1/contribution-cycles", new { stokvelId = Guid.NewGuid(), label = "2026-09", targetAmount = 100m });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -63,11 +63,11 @@ public class ContributionCycleAndContributionTests
 {
     var user = await CreateUserAsync();
     var stokvel = await CreateStokvelAsync();
-    var add = await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id });
+    var add = await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
     Assert.True(add.IsSuccessStatusCode, "AddMember: " + (int)add.StatusCode + " " + await add.Content.ReadAsStringAsync());
     var cycle = await CreateCycleAsync(stokvel.Id);
 
-    var request = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvel.Id}/contributions")
+    var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
     {
         Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m })
     };
@@ -83,10 +83,10 @@ public class ContributionCycleAndContributionTests
     {
         var user = await CreateUserAsync();
         var stokvel = await CreateStokvelAsync();
-        await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id });
+        await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
         var cycle = await CreateCycleAsync(stokvel.Id);
 
-        var response = await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/contributions", new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m });
+        var response = await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/contributions", new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -96,10 +96,10 @@ public class ContributionCycleAndContributionTests
     {
         var user = await CreateUserAsync();
         var stokvel = await CreateStokvelAsync();
-        await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id });
+        await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
         var cycle = await CreateCycleAsync(stokvel.Id);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvel.Id}/contributions")
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
         {
             Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = -50m })
         };
@@ -115,16 +115,16 @@ public class ContributionCycleAndContributionTests
     {
         var user = await CreateUserAsync();
         var stokvel = await CreateStokvelAsync();
-        await _client.PostAsJsonAsync($"/api/stokvels/{stokvel.Id}/members", new { userId = user.Id });
+        await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
         var cycle = await CreateCycleAsync(stokvel.Id);
 
         var body = new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m };
 
-        var first = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvel.Id}/contributions") { Content = JsonContent.Create(body) };
+        var first = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions") { Content = JsonContent.Create(body) };
         first.Headers.Add("Idempotency-Key", "key-a");
         await _client.SendAsync(first);
 
-        var second = new HttpRequestMessage(HttpMethod.Post, $"/api/stokvels/{stokvel.Id}/contributions") { Content = JsonContent.Create(body) };
+        var second = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions") { Content = JsonContent.Create(body) };
         second.Headers.Add("Idempotency-Key", "key-b");
         var response = await _client.SendAsync(second);
 

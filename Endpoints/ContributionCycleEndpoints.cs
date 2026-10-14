@@ -1,4 +1,4 @@
-// Maps every /api/contribution-cycles route, annotated with OpenAPI metadata.
+// Maps every /api/v1/contribution-cycles route, annotated with OpenAPI metadata.
 using RondiTrack.Authorization;
 using RondiTrack.Data;
 using RondiTrack.Domain;
@@ -17,7 +17,7 @@ public static class ContributionCycleEndpoints
 
     public static void MapContributionCycleEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/contribution-cycles").WithTags("ContributionCycles");
+        var group = app.MapGroup(ApiRoutes.ContributionCycles).WithTags("ContributionCycles");
 
         group.MapGet("/", async (HttpContext http, IContributionCycleRepository repo, IStokvelMembershipLookup membership) =>
         {
@@ -68,7 +68,7 @@ public static class ContributionCycleEndpoints
 
             var cycle = new ContributionCycle(request.StokvelId, request.Label, request.TargetAmount);
             await repo.AddAsync(cycle);
-            return Results.Created($"/api/contribution-cycles/{cycle.Id}", cycle.ToResponse());
+            return Results.Created($"{ApiRoutes.ContributionCycles}/{cycle.Id}", cycle.ToResponse());
         })
         .WithSummary("Create a contribution cycle for a stokvel")
         .WithDescription("""

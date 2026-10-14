@@ -8,11 +8,11 @@ public static class PayoutEndpoints
 {
     public static void MapPayoutEndpoints(this WebApplication app)
     {
-        app.MapPost("/api/stokvels/{stokvelId:guid}/cycles/{cycleId:guid}/payout", async (
+        app.MapPost(ApiRoutes.Stokvels + "/{stokvelId:guid}/cycles/{cycleId:guid}/payout", async (
             Guid stokvelId, Guid cycleId, IPayoutService service) =>
         {
             var response = await service.ProcessPayoutAsync(stokvelId, cycleId);
-            return Results.Created($"/api/stokvels/{stokvelId}/payouts/{response.Id}", response);
+            return Results.Created($"{ApiRoutes.Stokvels}/{stokvelId}/payouts/{response.Id}", response);
         })
         .RequireAuthorization(Policies.StokvelTreasurer)
         .WithTags("Payouts")

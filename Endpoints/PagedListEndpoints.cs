@@ -16,7 +16,7 @@ public static class PagedListEndpoints
 {
     public static void MapPagedListEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/stokvels/{stokvelId:guid}/cycles/{cycleId:guid}/contributions",
+        app.MapGet(ApiRoutes.Stokvels + "/{stokvelId:guid}/cycles/{cycleId:guid}/contributions",
             async (Guid stokvelId, Guid cycleId, [AsParameters] ContributionListQuery query,
                    IStokvelRepository stokvels, IContributionCycleRepository cycles,
                    ContributionQueryService service, CancellationToken ct) =>
@@ -36,7 +36,7 @@ public static class PagedListEndpoints
             })
             .RequireAuthorization(Policies.StokvelMember);
 
-        app.MapGet("/api/stokvels/{stokvelId:guid}/members",
+        app.MapGet(ApiRoutes.Stokvels + "/{stokvelId:guid}/members",
             async (Guid stokvelId, [AsParameters] MemberListQuery query,
                    IStokvelRepository stokvels, MemberQueryService service, CancellationToken ct) =>
             {

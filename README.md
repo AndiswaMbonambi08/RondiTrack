@@ -33,7 +33,7 @@ These rules reflect how stokvels operate in reality: fairness, accountability, a
 ## Example API Calls
 
 ### Create a user
-POST /api/users
+POST /api/v1/users
 Content-Type: application/json
 
 {
@@ -42,7 +42,7 @@ Content-Type: application/json
 }
 
 ### Create a stokvel
-POST /api/stokvels
+POST /api/v1/stokvels
 Content-Type: application/json
 
 {
@@ -51,15 +51,15 @@ Content-Type: application/json
 }
 
 ### Join a stokvel
-POST /api/stokvels/{id}/members
+POST /api/v1/stokvels/{id}/members
 Content-Type: application/json
 
 {
-  "userId": "<a real user id from GET /api/users>"
+  "userId": "<a real user id from GET /api/v1/users>"
 }
 
 ### Create a contribution cycle
-POST /api/contribution-cycles
+POST /api/v1/contribution-cycles
 Content-Type: application/json
 
 {
@@ -69,13 +69,13 @@ Content-Type: application/json
 }
 
 ### Record a contribution (idempotent)
-POST /api/stokvels/{id}/contributions
+POST /api/v1/stokvels/{id}/contributions
 Content-Type: application/json
 Idempotency-Key: key-1
 
 {
   "userId": "<a real member id>",
-  "contributionCycleId": "<a real cycle id from POST /api/contribution-cycles>",
+  "contributionCycleId": "<a real cycle id from POST /api/v1/contribution-cycles>",
   "amount": 500
 }
 
@@ -128,7 +128,7 @@ A record exists and the incoming request matches the stored one: the original re
 A record exists but the incoming request differs: the request is rejected with 422 Unprocessable Entity, since reusing a key for a different payload is a contradiction, not a retry.
 
 ## 400 vs 422
-This distinction is applied in the contribution-recording endpoint (POST /api/stokvels/{id}/contributions). 400 Bad Request is used for input that's wrong on its own, regardless of state, such as a negative contribution amount, a missing name, or an invalid email. 422 Unprocessable Entity is used for input that's well-formed but conflicts with something outside the payload itself, specifically reusing an idempotency key with a different request body. 409 Conflict is reserved for state conflicts on the resource itself, such as a duplicate member or a duplicate contribution for a cycle that's already been paid.
+This distinction is applied in the contribution-recording endpoint (POST /api/v1/stokvels/{id}/contributions). 400 Bad Request is used for input that's wrong on its own, regardless of state, such as a negative contribution amount, a missing name, or an invalid email. 422 Unprocessable Entity is used for input that's well-formed but conflicts with something outside the payload itself, specifically reusing an idempotency key with a different request body. 409 Conflict is reserved for state conflicts on the resource itself, such as a duplicate member or a duplicate contribution for a cycle that's already been paid.
 
 ## Exception hierarchy
 RequestValidationException (400), NotFoundException (404), ConflictException (409), and IdempotencyConflictException (422) each carry their own status code and title, so the centralized handler needs no long mapping table. A duplicate contribution and an idempotency-key conflict are classified as two different kinds of failure. A duplicate contribution conflicts with the current state of the stokvel (someone already paid this cycle), while an idempotency-key conflict violates the retry contract itself (the same key was already used for a different request). That distinction is why one is 409 and the other is 422.
@@ -142,7 +142,7 @@ Creating or updating a ContributionCycle involves no decision spanning more than
 ## Demonstrated error cases
 
 ### 400 Bad Request, malformed request (empty FullName)
-Request: POST /api/users
+Request: POST /api/v1/users
 {
   "fullName": "",
   "email": "test@example.com"
@@ -160,7 +160,7 @@ Screenshot:
 ![400 Bad Request response in Scalar](screenshots/400-bad-request.jpeg)
 
 ### 404 Not Found, nonexistent user
-Request: GET /api/users/00000000-0000-0000-0000-000000000000
+Request: GET /api/v1/users/00000000-0000-0000-0000-000000000000
 
 Response body:
 {
@@ -174,7 +174,7 @@ Screenshot:
 ![404 Not Found response in Scalar](screenshots/404-not-found.jpeg)
 
 ### 409 Conflict, duplicate stokvel membership
-Request: POST /api/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members
+Request: POST /api/v1/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members
 {
   "userId": "c31e9dff-7a92-4dd9-b469-b88eef15d677"
 }
@@ -206,38 +206,38 @@ Response body:
 Matching log line (from the terminal running dotnet run):
 fail: RondiTrack.ErrorHandling.RondiTrackExceptionHandler[0]
       Request failed. CorrelationId: 0HNOPS7L7BLPL:00000008, Method: POST,
-      Path: /api/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members, StatusCode: 409
+      Path: /api/v1/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members, StatusCode: 409
       RondiTrack.Domain.Exceptions.ConflictException: 'Sipho Dlamini' is already a member of this stokvel.ed. CorrelationId: 0HNOPS7L7BLPL:00000008, Method: POST,
-      Path: /api/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members, StatusCode: 409
+      Path: /api/v1/stokvels/0fd66196-0142-4d3c-bc40-afda684aa252/members, StatusCode: 409
       RondiTrack.Domain.Exceptions.ConflictException: 'Sipho Dlamini' is already a member of this stokvel.
 
       ## Definition of Done
 
 | Endpoint | Documented | Validated | Unit-tested | Integration-tested | Status codes reviewed |
 |---|---|---|---|---|---|
-| GET /api/users | Yes | N/A (no body) | N/A (no rule) | Yes | Yes |
-| GET /api/users/{id} | Yes | N/A | N/A | Yes (happy path + 404) | Yes |
-| POST /api/users | Yes | Yes | N/A (validation only) | Yes (happy path + 400) | Yes |
-| PUT /api/users/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
-| DELETE /api/users/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
-| GET /api/stokvels | Yes | N/A | N/A | Yes | Yes |
-| GET /api/stokvels/{id} | Yes | N/A | N/A | Yes | Yes |
-| POST /api/stokvels | Yes | Yes | N/A | Yes (happy path + 400 + boundary) | Yes |
-| PUT /api/stokvels/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
-| DELETE /api/stokvels/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
-| GET /api/stokvels/{id}/members | Yes | N/A | N/A | Yes (happy path + empty-collection edge case) | Yes |
-| POST /api/stokvels/{id}/members | Yes | Yes | Yes (inactive user, duplicate member) | Yes (happy path + 404 + 409 x2) | Yes |
-| DELETE /api/stokvels/{id}/members/{userId} | Yes | N/A | No (see gaps) | No (see gaps) | Yes |
-| POST /api/stokvels/{id}/contributions | Yes | Yes | Yes (duplicate contribution, idempotency comparison) | Yes (happy path + 400 x2 + 404 + 409 + 422 + cross stokvel edge case) | Yes |
-| GET /api/contribution-cycles | Yes | N/A | N/A | No (see gaps) | Yes |
-| GET /api/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
-| POST /api/contribution-cycles | Yes | Yes | N/A | Yes (happy path + 400 + 404) | Yes |
-| PUT /api/contribution-cycles/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
-| DELETE /api/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
+| GET /api/v1/users | Yes | N/A (no body) | N/A (no rule) | Yes | Yes |
+| GET /api/v1/users/{id} | Yes | N/A | N/A | Yes (happy path + 404) | Yes |
+| POST /api/v1/users | Yes | Yes | N/A (validation only) | Yes (happy path + 400) | Yes |
+| PUT /api/v1/users/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
+| DELETE /api/v1/users/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
+| GET /api/v1/stokvels | Yes | N/A | N/A | Yes | Yes |
+| GET /api/v1/stokvels/{id} | Yes | N/A | N/A | Yes | Yes |
+| POST /api/v1/stokvels | Yes | Yes | N/A | Yes (happy path + 400 + boundary) | Yes |
+| PUT /api/v1/stokvels/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
+| DELETE /api/v1/stokvels/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
+| GET /api/v1/stokvels/{id}/members | Yes | N/A | N/A | Yes (happy path + empty-collection edge case) | Yes |
+| POST /api/v1/stokvels/{id}/members | Yes | Yes | Yes (inactive user, duplicate member) | Yes (happy path + 404 + 409 x2) | Yes |
+| DELETE /api/v1/stokvels/{id}/members/{userId} | Yes | N/A | No (see gaps) | No (see gaps) | Yes |
+| POST /api/v1/stokvels/{id}/contributions | Yes | Yes | Yes (duplicate contribution, idempotency comparison) | Yes (happy path + 400 x2 + 404 + 409 + 422 + cross stokvel edge case) | Yes |
+| GET /api/v1/contribution-cycles | Yes | N/A | N/A | No (see gaps) | Yes |
+| GET /api/v1/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
+| POST /api/v1/contribution-cycles | Yes | Yes | N/A | Yes (happy path + 400 + 404) | Yes |
+| PUT /api/v1/contribution-cycles/{id} | Yes | Yes | N/A | No (see gaps) | Yes |
+| DELETE /api/v1/contribution-cycles/{id} | Yes | N/A | N/A | No (see gaps) | Yes |
 
 ## Edge cases
 
-1. Empty collection: GET /api/stokvels/{id}/members on a brand new stokvel. Found by asking what an endpoint returns before its typical use case has happened yet. Asserts 200 with an empty array, not an error.
+1. Empty collection: GET /api/v1/stokvels/{id}/members on a brand new stokvel. Found by asking what an endpoint returns before its typical use case has happened yet. Asserts 200 with an empty array, not an error.
 2. Boundary value: contributionAmount set to 0.01. Found by reading each FluentValidation rule and checking the exact boundary it enforces. GreaterThan(0) means 0 itself must fail, already covered by the 400 test, while the smallest representable positive amount must succeed. Asserts 201.
 3. Cross resource validity: recording a contribution against a real ContributionCycle that belongs to a different, also real stokvel than the one in the URL. Found by reading StokvelService.RecordContributionAsync and noticing the explicit cycle.StokvelId check. Both the stokvel and the cycle are independently valid, only their combination is wrong. Asserts 404.
 
@@ -272,7 +272,7 @@ The check was restored immediately afterward, and the suite returned to all gree
 
 PUT and DELETE across all three resources, and the plain GET-all and GET-by-id for contribution cycles, are documented and status code reviewed but not integration tested. They follow the exact same fetch, mutate, respond pattern already proven by the corresponding tests on Users and Stokvels, so testing them again would exercise plumbing rather than new behavior.
 
-DELETE /api/stokvels/{id}/members/{userId}'s not-a-member rule is the one gap I would close first given more time, since it is a real business rule rather than routine CRUD, and it is the only untested case in that category.
+DELETE /api/v1/stokvels/{id}/members/{userId}'s not-a-member rule is the one gap I would close first given more time, since it is a real business rule rather than routine CRUD, and it is the only untested case in that category.
 
 Three behavioral gaps are also documented directly in the OpenAPI descriptions: deleting a User does not remove their memberships, deleting a Stokvel does not delete its ContributionCycles, and deleting a ContributionCycle does not check for contributions already recorded against it.
 
@@ -388,7 +388,7 @@ for a cycle. Stokvel ↔ ContributionCycle was a fair alternative but nothing
 yet actually queries through it.
 
 ## N+1 measurement
-Naive endpoint (GET /api/stokvels/{stokvelId}/cycles/{cycleId}/contributions),
+Naive endpoint (GET /api/v1/stokvels/{stokvelId}/cycles/{cycleId}/contributions),
 tested with [N] contributions in a cycle, fired [PASTE YOUR REAL COUNT HERE]
 queries: 1 to load the contributions, then one StokvelMember lookup and one
 User lookup per row.
@@ -406,7 +406,7 @@ full object graph.
 
 ## Loading strategy, named as a decision
 The new contributions endpoint uses projection, chosen above, for
-performance. GET /api/stokvels/{id} uses explicit, hand-written loading
+performance. GET /api/v1/stokvels/{id} uses explicit, hand-written loading
 (LoadMembersAsync queries StokvelMembers separately) rather than Include,
 because MemberIds is Ignore()'d entirely in the DbContext (a decision made in
 5.1), so Include was never an option for it. Lazy loading appears nowhere in
@@ -462,7 +462,7 @@ than extra scope.
 | Area                    | Result / evidence                                                                                                                                                                                                     |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Read-query audit        | Read endpoints were audited for materialising collections before filtering/paging. The audit was recorded in `docs/audit-raw.txt`.                                                                                    |
-| Projection query        | `GET /api/stokvels/{stokvelId}/cycles/{cycleId}/contributions` uses a projection rather than eager-loading the complete `Contribution -> StokvelMember -> User` graph.                                                |
+| Projection query        | `GET /api/v1/stokvels/{stokvelId}/cycles/{cycleId}/contributions` uses a projection rather than eager-loading the complete `Contribution -> StokvelMember -> User` graph.                                                |
 | Pagination              | Pagination contract added for contributions/members, including page size, continuation token, sorting and filter allow-lists.                                                                                         |
 | Composite index         | Added migration `20261006062004_AddContributionPagingIndex`.                                                                                                                                                          |
 | Duplicate contributions | `SELECT "ContributionCycleId", "UserId", COUNT(*) FROM "Contributions" GROUP BY 1,2 HAVING COUNT(*) > 1;` returned **0 rows**.                                                                                        |
@@ -738,14 +738,14 @@ The refresh token travels only in a cookie and is never in a response body.
 | `HttpOnly` | on | JavaScript cannot read the cookie, so an XSS bug cannot steal the long-lived token |
 | `Secure` | on | Only sent over HTTPS, never in plain text |
 | `SameSite` | `Strict` | Never sent on cross-site requests, which blocks CSRF against the refresh and logout endpoints |
-| `Path` | `/api/auth` | Only sent to the auth endpoints, not attached to every API call |
+| `Path` | `/api/v1/auth` | Only sent to the auth endpoints, not attached to every API call |
 | `Expires` | the token's expiry | The cookie disappears when the token would stop working anyway |
 
 `SameSite=Strict` assumes the frontend and the API are on the same site (for example `app.example.com` and `api.example.com`). If they were on unrelated domains, this would need `SameSite=None` plus a CSRF defence.
 
 ### Advice to the frontend team
 
-- **Access token:** keep it in memory only (a JavaScript variable). On a page reload, call `POST /api/auth/refresh`; the browser sends the cookie automatically and returns a new access token.
+- **Access token:** keep it in memory only (a JavaScript variable). On a page reload, call `POST /api/v1/auth/refresh`; the browser sends the cookie automatically and returns a new access token.
 - **Refresh token:** the frontend never touches it. It lives in the HttpOnly cookie.
 - **What `localStorage` would lose.** Any script on the page, including one injected through an XSS bug or a compromised dependency, can read `localStorage`. A stolen access token is usable for up to 15 minutes. A stolen refresh token would be usable for 7 days, and could be used silently from another machine. The HttpOnly cookie removes that whole class of theft.
 
@@ -794,34 +794,34 @@ Authentication proves who the caller is. Authorization decides what they may do 
 
 ### Authorization matrix
 
-Cells are the status codes returned. A request with no token returns 401 problem JSON on every row except `/api/auth/*` and the OpenAPI pages, which are anonymous.
+Cells are the status codes returned. A request with no token returns 401 problem JSON on every row except `/api/v1/auth/*` and the OpenAPI pages, which are anonymous.
 
 | Endpoint | Non-member | Member | Treasurer | Admin | Platform admin |
 |---|---|---|---|---|---|
-| `GET /api/stokvels` (plain role check) | 403 | 403 | 403 | 403 | 200 |
-| `POST /api/stokvels` (creator becomes Admin) | 201 | 201 | 201 | 201 | 201 |
-| `PUT /api/stokvels/{id}` | 404 | 403 | 403 | 200 | 200 |
-| `DELETE /api/stokvels/{id}` | 404 | 403 | 403 | 204 | 204 |
-| `POST /api/stokvels/{id}/members` | 404 | 403 | 403 | 201 | 201 |
-| `DELETE /api/stokvels/{id}/members/{userId}` | 404 | 403 | 403 | 204 | 204 |
-| `GET /api/stokvels/{id}/members` | 404 | 200 | 200 | 200 | 200 |
-| `GET /api/stokvels/{id}/cycles/{cycleId}/contributions` | 404 | 200 | 200 | 200 | 200 |
-| `POST /api/stokvels/{id}/contributions` (own) | 404 | 201 | 201 | 201 | 201 |
-| `POST /api/stokvels/{id}/contributions` (someone else's) | 404 | 403 | 201 | 201 | 201 |
-| `POST /api/stokvels/{id}/cycles/{cycleId}/payout` | 404 | 403 | 201 | 201 | 201 |
-| `POST /api/contribution-cycles` (stokvel id in body) | 404 | 403 | 201 | 201 | 201 |
-| `GET /api/contribution-cycles` (own stokvels only) | 200 (empty) | 200 | 200 | 200 | 200 (all) |
-| `GET /api/contribution-cycles/{id}` | 404 | 200 | 200 | 200 | 200 |
-| `PUT /api/contribution-cycles/{id}` | 404 | 403 | 200 | 200 | 200 |
-| `DELETE /api/contribution-cycles/{id}` | 404 | 403 | 403 | 204 | 204 |
-| `GET /api/payouts/{id}` | 404 | 200 | 200 | 200 | 200 |
-| `PUT /api/payouts/{id}` | 404 | 403 | 200 | 200 | 200 |
-| `/api/users` and `/api/users/{id}` (self or platform admin) | 403 | 403 | 403 | 403 | 200 |
+| `GET /api/v1/stokvels` (plain role check) | 403 | 403 | 403 | 403 | 200 |
+| `POST /api/v1/stokvels` (creator becomes Admin) | 201 | 201 | 201 | 201 | 201 |
+| `PUT /api/v1/stokvels/{id}` | 404 | 403 | 403 | 200 | 200 |
+| `DELETE /api/v1/stokvels/{id}` | 404 | 403 | 403 | 204 | 204 |
+| `POST /api/v1/stokvels/{id}/members` | 404 | 403 | 403 | 201 | 201 |
+| `DELETE /api/v1/stokvels/{id}/members/{userId}` | 404 | 403 | 403 | 204 | 204 |
+| `GET /api/v1/stokvels/{id}/members` | 404 | 200 | 200 | 200 | 200 |
+| `GET /api/v1/stokvels/{id}/cycles/{cycleId}/contributions` | 404 | 200 | 200 | 200 | 200 |
+| `POST /api/v1/stokvels/{id}/contributions` (own) | 404 | 201 | 201 | 201 | 201 |
+| `POST /api/v1/stokvels/{id}/contributions` (someone else's) | 404 | 403 | 201 | 201 | 201 |
+| `POST /api/v1/stokvels/{id}/cycles/{cycleId}/payout` | 404 | 403 | 201 | 201 | 201 |
+| `POST /api/v1/contribution-cycles` (stokvel id in body) | 404 | 403 | 201 | 201 | 201 |
+| `GET /api/v1/contribution-cycles` (own stokvels only) | 200 (empty) | 200 | 200 | 200 | 200 (all) |
+| `GET /api/v1/contribution-cycles/{id}` | 404 | 200 | 200 | 200 | 200 |
+| `PUT /api/v1/contribution-cycles/{id}` | 404 | 403 | 200 | 200 | 200 |
+| `DELETE /api/v1/contribution-cycles/{id}` | 404 | 403 | 403 | 204 | 204 |
+| `GET /api/v1/payouts/{id}` | 404 | 200 | 200 | 200 | 200 |
+| `PUT /api/v1/payouts/{id}` | 404 | 403 | 200 | 200 | 200 |
+| `/api/v1/users` and `/api/v1/users/{id}` (self or platform admin) | 403 | 403 | 403 | 403 | 200 |
 
 Notes on the table:
 - Admin satisfies every Treasurer check. The role order is Member, then Treasurer, then Admin.
-- On `/api/users/{id}` a caller may act on their own record (200). The list and create routes have no id, so they are platform admin only.
-- Routes outside the `/api/stokvels/{id}` prefix look the stokvel up from the cycle or payout, then run the same policy. A non-member gets the same 404 text as a record that does not exist.
+- On `/api/v1/users/{id}` a caller may act on their own record (200). The list and create routes have no id, so they are platform admin only.
+- Routes outside the `/api/v1/stokvels/{id}` prefix look the stokvel up from the cycle or payout, then run the same policy. A non-member gets the same 404 text as a record that does not exist.
 
 ### Why non-members get 404 and members without the role get 403
 
@@ -843,7 +843,7 @@ The default test client is a platform admin who is allowed through stokvel check
 
 ### Role-based vs policy-based
 
-The one plain role check is `GET /api/stokvels`:
+The one plain role check is `GET /api/v1/stokvels`:
 
 ```csharp
 .RequireAuthorization(new AuthorizeAttribute { Roles = PlatformRoles.PlatformAdmin })
@@ -867,7 +867,7 @@ Content-Type: application/json; charset=utf-8
 Date: Sun, 11 Oct 2026 23:32:46 GMT
 Server: Kestrel
 Cache-Control: no-store
-Set-Cookie: refresh_token=lEOIIZOn3eKKJLljnOFNj0AoZZ_I8n4wPd1u2voOs54; expires=Sun, 18 Oct 2026 23:32:46 GMT; path=/api/auth; secure; samesite=strict; httponly
+Set-Cookie: refresh_token=lEOIIZOn3eKKJLljnOFNj0AoZZ_I8n4wPd1u2voOs54; expires=Sun, 18 Oct 2026 23:32:46 GMT; path=/api/v1/auth; secure; samesite=strict; httponly
 Transfer-Encoding: chunked
 ```
 
@@ -881,7 +881,7 @@ Login logs `Login succeeded. UserId, FamilyId`, a successful refresh logs `Refre
 Test summary: total: 53, failed: 0, succeeded: 53, skipped: 0, duration: 123.9s
 ```
 
-The new tests cover: no token returns 401 problem JSON; non-member 404, member without the role 403 and treasurer 201 on the same payout endpoint; a member records their own contribution and is refused for someone else's (403); refresh rotates the token; replaying the old token returns 401 and the newer token is then also rejected; refresh after logout returns 401; logout is idempotent; a wrong password and an unknown email return identical problem details; the login response sets the hardened cookie and its body contains no refresh token; and `GET /api/stokvels` is 403 for an ordinary user and 200 for a platform admin.
+The new tests cover: no token returns 401 problem JSON; non-member 404, member without the role 403 and treasurer 201 on the same payout endpoint; a member records their own contribution and is refused for someone else's (403); refresh rotates the token; replaying the old token returns 401 and the newer token is then also rejected; refresh after logout returns 401; logout is idempotent; a wrong password and an unknown email return identical problem details; the login response sets the hardened cookie and its body contains no refresh token; and `GET /api/v1/stokvels` is 403 for an ordinary user and 200 for a platform admin.
 
 ## Gaps I chose not to close yet
 
@@ -892,7 +892,7 @@ The new tests cover: no token returns 401 problem JSON; non-member 404, member w
 - **Access tokens cannot be revoked before they expire.** Logout and reuse detection revoke refresh tokens, so the longest an old access token lives is 15 minutes.
 - **No rate limiting or lockout on login.** Brute force is slowed only by password hashing.
 - **The idempotency store is in memory and keyed only by the `Idempotency-Key` header.** It is not scoped per user and does not survive a restart.
-- **The user repository is still in memory with a mirror to the database.** This was a stated decision from earlier weeks. `POST /api/users` creates a user with no password, and is now platform admin only.
+- **The user repository is still in memory with a mirror to the database.** This was a stated decision from earlier weeks. `POST /api/v1/users` creates a user with no password, and is now platform admin only.
 - **Deleting a stokvel leaves its cycles, and deleting a user leaves their memberships.** Both were already documented gaps.
 
 
@@ -978,5 +978,133 @@ With the dev database stopped: `Test summary: total: 59, failed: 0, succeeded: 5
 ## Known gaps (not closed yet)
 - No sampling, no log retention policy, no alerting.
 - The app crashes at startup if the database is down (query at `Program.cs` line 209 exhausts retries).
-- `GET /api/stokvels` runs the same membership query about 20 times per request (N+1 from 6.1).
+- `GET /api/v1/stokvels` runs the same membership query about 20 times per request (N+1 from 6.1).
 - Aspire dashboard is unauthenticated: local use only.
+
+## Assignment 6.3: Ready for the frontend
+
+### Versioning
+Every route lives under `/api/v1`. The prefix is one constant in `Endpoints/ApiRoutes.cs` and endpoints build their groups from it. The refresh cookie's `Path` is `ApiRoutes.Auth` (`/api/v1/auth`), so it moved with the routes. `AuthFlowTests` proves refresh works at the new path and that the old unversioned path returns 404. Existing test URLs were updated and no assertion changed.
+
+### CORS
+Origins come from `Cors:AllowedOrigins`: an empty list in `appsettings.json` and `http://localhost:3000` in Development. The policy is named once (`Frontend`, in `Browser/FrontendCors.cs`) and endpoints never mention CORS.
+
+- Credentials are allowed, so the origin must be an exact match. Startup validation rejects `*`, paths and trailing slashes. The request's `Origin` is never reflected.
+- Methods: GET, POST, PUT, DELETE. Headers: Content-Type, Authorization, Idempotency-Key, If-Match.
+- Exposed response headers: Retry-After, ETag, Location, Idempotency-Replayed.
+- `UseCors` runs before authentication, so preflights are answered without a token and the fallback authorization policy never sees them.
+- The exception handler clears the response before writing, which drops CORS headers. It calls `FrontendCors.ReapplyAsync` so 404, 409 and other errors stay readable by the browser.
+
+### Will the refresh cookie arrive?
+The cookie is `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`. An origin is scheme + host + port. A site is scheme + registrable domain (ports ignored). CORS cares about origins. `SameSite` cares about sites. The frontend must also call with `credentials: "include"`.
+
+| Frontend to API | Same origin? | Same site? | Cookie sent? |
+|---|---|---|---|
+| `localhost:3000` to `localhost:5051` (dev) | No (port differs) | Yes | **Yes.** `Secure` is accepted on `localhost` by Chrome and Firefox. Safari may refuse it over plain http. |
+| `app.ronditrack.co.za` to `api.ronditrack.co.za` | No (host differs) | Yes (both under `ronditrack.co.za`) | **Yes**, as long as CORS lists `https://app.ronditrack.co.za`. |
+| `ronditrack.vercel.app` to `ronditrack-api.azurewebsites.net` | No | **No.** `vercel.app` and `azurewebsites.net` are public suffixes, so each full hostname is its own site. | **No.** A `Strict` cookie is not stored or sent cross-site. Making it work needs `SameSite=None; Secure`, which third-party cookie blocking can still defeat. The better fix is a custom domain for both under one registrable domain. |
+
+### Rate limiting
+| Policy | Algorithm | Partition | Default |
+|---|---|---|---|
+| `login` | Fixed window | Client IP | 5 per 60 s |
+| `record-contribution` | Token bucket | Signed-in user id | bucket 30, +1 token per 10 s |
+| `process-payout` | Token bucket | Signed-in user id | bucket 5, +1 token per 30 s |
+
+All values come from the `RateLimit` config section. Policy names are constants in `Browser/RateLimiting.cs`.
+
+**Why a token bucket for money.** A treasurer may record twenty contributions after a meeting and then nothing for a month. A fixed window would either block that burst or allow a sustained flood. The bucket allows a burst of 30 and refills slowly, so a long idle period restores the full burst. Payouts are rarer and more serious, so the bucket is 5 with a slower refill.
+
+Every rejection is a 429 with a `Retry-After` header and a problem+json body holding title, detail and `correlationId`.
+
+### Pipeline order
+`ExceptionHandler`, `StatusCodePages`, `CORS`, `Authentication`, `RateLimiter`, `Authorization`, then the endpoint (validation filter, service, idempotency check).
+
+1. Exception handling is outermost so every failure gets the same shape.
+2. CORS comes before anything that can reject, so preflights succeed and error responses carry headers.
+3. Authentication runs before the limiter so money limits can partition by user id.
+4. The limiter runs before authorization so membership lookups in the database are protected from floods.
+5. Idempotency sits inside the service, after all of the above, so a request rejected with 429 never reaches the key store.
+
+### Idempotency survives a 429
+A 429 is produced by middleware before the endpoint runs, so its key is never read or stored. The test `A429_DoesNotConsumeTheKey_RetryAfterTheWindowCreatesOnce_AndNextRetryIsAReplay` exhausts the bucket, gets a 429 for key K, waits the server's `Retry-After`, sends K again (201), sends K a third time (201 with `Idempotency-Replayed: true`) and asserts exactly one contribution row exists.
+
+### Behind a load balancer with three instances
+- **Limits multiply.** Limiters and the idempotency store are in memory per process. With three instances and round robin, the effective limits are up to 3x (login about 15 per minute per IP, money buckets of 90).
+- **Real client IPs are lost.** No forwarded-headers middleware is configured, so behind a proxy every request would share the proxy's IP and login would be limited as one partition.
+- **Replays can miss.** A retry that lands on a different instance does not find the key and tries to record again. The database's unique constraint on a user's contribution per cycle is the backstop (409), so money is never doubled.
+
+The fix is a shared store (Redis) for limits and idempotency keys, plus `UseForwardedHeaders` with trusted proxies. Not done yet.
+
+### A whole stokvel on one Wi-Fi IP
+Money endpoints are partitioned by user, so shared IPs do not affect them. Login is partitioned by IP, so twenty members signing in together from one venue would share five attempts per minute and some would get 429. Raising `RateLimit:Login:PermitLimit` for that case, or partitioning by IP plus email, are the options. Neither is done yet.
+
+### Home screen: `GET /api/v1/me/home`
+One response covers every stokvel the caller belongs to. Calculations run on the server using `TimeProvider`.
+
+| Field | Why it is there |
+|---|---|
+| `asOfUtc` | The moment the figures were calculated, in UTC |
+| `stokvels[].stokvelId` | Lets the screen link to the stokvel |
+| `stokvels[].name` | Card title |
+| `stokvels[].role` | The caller's role in this stokvel, as a name (a person can be Member in one and Treasurer in another) |
+| `stokvels[].currentCycle` | `{ id, label }` or `null` when no cycle is open |
+| `stokvels[].paidCents` | What the caller has paid this cycle |
+| `stokvels[].owedCents` | What the caller still owes this cycle |
+| `stokvels[].nextPayoutUtc` | UTC date or `null` |
+
+Other members' amounts are not included. A user in no stokvels gets `200` with an empty list.
+
+**Money is integer cents** (`int64`). JavaScript numbers are exact for integers up to 2^53, so the client adds and compares without rounding errors. Decimal strings would need a decimal library on the client. Formatting as rand happens only at display time.
+
+### Error contract
+Every error is `application/problem+json` with `status`, `title`, `detail` and `correlationId`. No response contains an exception type, stack trace or exception message from a 5xx.
+
+| Status | Source | Shape |
+|---|---|---|
+| 400 | FluentValidation via `ValidationFilter` | Base fields plus `errors`: `{ camelCaseField: [messages] }` |
+| 400 | Missing header (e.g. `Idempotency-Key`) | Base fields, no `errors` |
+| 400 | Malformed JSON or wrong type, including a number sent as a string | Base fields, fixed detail "The request body is missing, malformed or has a value of the wrong type." |
+| 400 | `ArgumentException` | Base fields, message with the `(Parameter 'x')` suffix removed |
+| 401 | Login or refresh failure | Base fields, one fixed message per endpoint |
+| 401 | Missing or invalid token | Framework problem details with `correlationId` **(check)** |
+| 403 | Authorization handler | Base fields **(check)** |
+| 404 | Missing resource, or non-member of the stokvel | Base fields, same text for both |
+| 409 | Duplicate member or contribution, or database unique violation | Base fields |
+| 412 | Concurrency token mismatch on update | Base fields |
+| 422 | Idempotency key reused with a different body | Base fields |
+| 428 | `If-Match` missing | Base fields |
+| 429 | Rate limiter | Base fields plus `Retry-After` header |
+| 500 | Anything else | Base fields, detail "An unexpected error occurred." Details are in the log only |
+
+Numbers are strict: `JsonNumberHandling.Strict` makes `"amount": "100"` a 400, and the generated OpenAPI document describes integers and decimals as numbers only. `ErrorContractTests` checks the document for any schema that allows both string and number. `ThrowOnBadRequest` is set so binding failures reach the handler outside Development too.
+
+### The contract as code
+`clients/typescript/` holds `openapi-typescript` 7.13.0 and `typescript` 5.9.3 (pinned) with a function `totalOwedCents(home)`.
+
+```powershell
+$env:EXPORT_OPENAPI_TO = "$PWD\clients\typescript\openapi.json"
+dotnet test --filter "FullyQualifiedName~ExportOpenApiForTypeScriptClient"
+Remove-Item Env:EXPORT_OPENAPI_TO
+cd clients\typescript
+npm run verify
+```
+
+**Before the rename:** `tsc --noEmit --strict` printed nothing (clean compile).
+
+**After renaming `OwedCents` to `OwedInCents` in C# and regenerating:**
+```
+src/totalOwed.ts(7,52): error TS2551: Property 'owedCents' does not exist on type '{ stokvelId: string; name: string; role: string; currentCycle: { id: string; label: string; } | null; paidCents: number; owedInCents: number; nextPayoutUtc: string | null; }'. Did you mean 'owedInCents'?
+```
+The rename was then reverted and the compile is clean again.
+
+### Test results
+Run with the dev PostgreSQL service stopped and Docker running (Testcontainers): `Passed! Failed: 0, Passed: 80, Skipped: 0, Total: 80, Duration: 2 m 22 s`.
+
+### Gaps I chose not to close yet
+- Rate limits and idempotency keys are in memory, so they are per instance (see the load balancer section).
+- No forwarded-headers handling for client IPs behind a proxy.
+- Login is limited by IP only, which hurts shared networks.
+- The Vercel to Azure cookie case needs a custom domain and was not built.
+- `ArgumentException` messages are returned after stripping the parameter name. A fixed message would be safer.
+- Commit history: the money rate limit, idempotency scoping and login rate limit were squashed into the home-screen commit by a soft reset, and `ErrorContractTests.cs` landed in the TypeScript commit.
