@@ -11,6 +11,7 @@ using Scalar.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
@@ -106,6 +107,19 @@ builder.Services.AddSingleton<ITokenService, TokenService>();
 
 
 builder.Services.AddOpenApi();
+
+// Strict numbers: the web defaults let "100" bind to a number and make the OpenAPI document
+// describe numbers as "number or string". Strict fixes both. A JSON number sent as a string
+// now fails to bind and returns 400.
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+});
+
+// Binding failures throw instead of returning a bare 400, so they reach RondiTrackExceptionHandler
+// and get the problem+json body with a correlationId. Without this the default is true only in
+// Development, so production would skip the error contract.
+builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 
 // CORS: one named policy for the browser frontend. Origins come from the Cors:AllowedOrigins config section.
 builder.Services.AddFrontendCors();

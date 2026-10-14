@@ -1,6 +1,3 @@
-// A minimal-API endpoint filter that runs FluentValidation on a request DTO before the
-// endpoint's own code runs. If validation fails, it throws RequestValidationException,
-// which the centralized handler turns into a 400 problem+json response.
 using FluentValidation;
 using RondiTrack.Domain.Exceptions;
 
@@ -21,11 +18,19 @@ public class ValidationFilter<TRequest> : IEndpointFilter where TRequest : class
                 if (!result.IsValid)
                 {
                     var message = string.Join(" ", result.Errors.Select(e => e.ErrorMessage));
-                    throw new RequestValidationException(message);
+                    var errors = result.Errors
+                        .GroupBy(e => CamelCase(e.PropertyName))
+                        .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).Distinct().ToArray());
+                    throw new RequestValidationException(message, errors);
                 }
             }
         }
 
         return await next(context);
     }
+
+    // "ContributionAmount" -> "contributionAmount"; "Items[0].Name" -> "items[0].name"
+    private static string CamelCase(string path) =>
+        string.Join('.', path.Split('.').Select(s =>
+            s.Length == 0 ? s : char.ToLowerInvariant(s[0]) + s[1..]));
 }
