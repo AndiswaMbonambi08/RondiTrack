@@ -17,28 +17,39 @@ public class MoneyRateLimitTests : IDisposable
 {
     private const int Limit = 3;
 
+    // Long enough that no token can return while a test is running.
+    private const int NoRefillSeconds = 600;
+
     private readonly PostgresApiFactory _factory;
     private readonly HttpClient _admin;
-    private readonly WebApplicationFactory<Program> _app;
+    private readonly List<WebApplicationFactory<Program>> _hosts = new();
 
     public MoneyRateLimitTests(PostgresApiFactory factory)
     {
         _factory = factory;
         _admin = factory.CreateClient();   // platform admin, used only to arrange data
+    }
 
-        // WithWebHostBuilder builds a new host, so these tests get their own fresh limiter.
-        // The bucket refills completely every second, so a short wait is enough.
-        _app = factory.WithWebHostBuilder(b =>
+    public void Dispose()
+    {
+        foreach (var host in _hosts) host.Dispose();
+    }
+
+    // ---- helpers -------------------------------------------------------------------------
+
+    // WithWebHostBuilder builds a new host, so each test gets its own fresh limiter.
+    // Each test chooses its own replenish period, so no test depends on the clock.
+    private WebApplicationFactory<Program> NewHost(int replenishSeconds)
+    {
+        var host = _factory.WithWebHostBuilder(b =>
         {
             b.UseSetting("RateLimit:RecordContribution:TokenLimit", Limit.ToString());
             b.UseSetting("RateLimit:RecordContribution:TokensPerPeriod", Limit.ToString());
-            b.UseSetting("RateLimit:RecordContribution:ReplenishSeconds", "1");
+            b.UseSetting("RateLimit:RecordContribution:ReplenishSeconds", replenishSeconds.ToString());
         });
+        _hosts.Add(host);
+        return host;
     }
-
-    public void Dispose() => _app.Dispose();
-
-    // ---- helpers -------------------------------------------------------------------------
 
     private async Task<Guid> CreateUserAsync()
     {
@@ -70,9 +81,9 @@ public class MoneyRateLimitTests : IDisposable
         return (stokvelId, cycleId, members);
     }
 
-    private HttpClient ClientFor(Guid userId)
+    private HttpClient ClientFor(WebApplicationFactory<Program> host, Guid userId)
     {
-        var client = _app.CreateClient();
+        var client = host.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", _factory.MintToken(userId));
         return client;
@@ -93,7 +104,7 @@ public class MoneyRateLimitTests : IDisposable
     private static string? Header(HttpResponseMessage res, string name) =>
         res.Headers.TryGetValues(name, out var values) ? string.Join(",", values) : null;
 
-    private async Task ExhaustAsync(HttpClient client, Guid stokvelId, Guid cycleId, Guid userId)
+    private static async Task ExhaustAsync(HttpClient client, Guid stokvelId, Guid cycleId, Guid userId)
     {
         for (var i = 0; i < Limit; i++)
         {
@@ -107,9 +118,12 @@ public class MoneyRateLimitTests : IDisposable
     [Fact]
     public async Task A429_DoesNotConsumeTheKey_RetryAfterTheWindowCreatesOnce_AndNextRetryIsAReplay()
     {
+        // 8 seconds: a slow machine cannot refill the bucket between exhausting it and the 429 check.
+        var host = NewHost(replenishSeconds: 8);
+
         var (stokvelId, cycleId, members) = await ArrangeAsync(1);
         var userId = members[0];
-        var client = ClientFor(userId);
+        var client = ClientFor(host, userId);
 
         await ExhaustAsync(client, stokvelId, cycleId, userId);
 
@@ -119,8 +133,9 @@ public class MoneyRateLimitTests : IDisposable
         Assert.NotNull(blocked.Headers.RetryAfter?.Delta);
         Assert.Equal("application/problem+json", blocked.Content.Headers.ContentType?.MediaType);
 
-        // Wait out the 1 second window (with margin), then the same key K is accepted.
-        await Task.Delay(TimeSpan.FromSeconds(2.5));
+        // Wait as long as the server said, plus a margin, then the same key K is accepted.
+        var wait = blocked.Headers.RetryAfter!.Delta!.Value + TimeSpan.FromSeconds(1);
+        await Task.Delay(wait);
         var created = await client.SendAsync(Contribution(stokvelId, cycleId, userId, "K"));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.Null(Header(created, "Idempotency-Replayed"));
@@ -131,7 +146,7 @@ public class MoneyRateLimitTests : IDisposable
         Assert.Equal("true", Header(replay, "Idempotency-Replayed"));
 
         // Exactly one row in the database.
-        using var scope = _app.Services.CreateScope();
+        using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RondiTrackDbContext>();
         var rows = await db.Contributions.CountAsync(c => c.ContributionCycleId == cycleId);
         Assert.Equal(1, rows);
@@ -140,26 +155,30 @@ public class MoneyRateLimitTests : IDisposable
     [Fact]
     public async Task UserAExhaustingTheLimit_DoesNotAffectUserB()
     {
+        var host = NewHost(NoRefillSeconds);
+
         var (stokvelId, cycleId, members) = await ArrangeAsync(2);
         var userA = members[0];
         var userB = members[1];
 
-        var clientA = ClientFor(userA);
+        var clientA = ClientFor(host, userA);
         await ExhaustAsync(clientA, stokvelId, cycleId, userA);
         var blocked = await clientA.SendAsync(Contribution(stokvelId, cycleId, userA, "A-key"));
         Assert.Equal(HttpStatusCode.TooManyRequests, blocked.StatusCode);
 
-        var resB = await ClientFor(userB).SendAsync(Contribution(stokvelId, cycleId, userB, "B-key"));
+        var resB = await ClientFor(host, userB).SendAsync(Contribution(stokvelId, cycleId, userB, "B-key"));
         Assert.Equal(HttpStatusCode.Created, resB.StatusCode);
     }
 
     [Fact]
     public async Task TwoUsersPickingTheSameKey_DoNotCollide()
     {
+        var host = NewHost(NoRefillSeconds);
+
         var (stokvelId, cycleId, members) = await ArrangeAsync(2);
 
-        var first = await ClientFor(members[0]).SendAsync(Contribution(stokvelId, cycleId, members[0], "shared-key"));
-        var second = await ClientFor(members[1]).SendAsync(Contribution(stokvelId, cycleId, members[1], "shared-key"));
+        var first = await ClientFor(host, members[0]).SendAsync(Contribution(stokvelId, cycleId, members[0], "shared-key"));
+        var second = await ClientFor(host, members[1]).SendAsync(Contribution(stokvelId, cycleId, members[1], "shared-key"));
 
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
