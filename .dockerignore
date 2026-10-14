@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/.vs/
+.git/
+.gitignore
+.github/
+**/TestResults/
+**/node_modules/
+.env
+.env.*
+clients/
+tools/
+docs/
+screenshots/
+RondiTrack.Tests/
+README.md
