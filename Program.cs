@@ -27,6 +27,14 @@ using OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Fail fast: refuse to start when a required setting is missing, and name it.
+// This runs before anything else, so a misconfigured container exits at startup
+// and never fails on the first request.
+if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("RondiTrack")))
+    throw new InvalidOperationException(
+        "Missing required setting 'ConnectionStrings:RondiTrack' " +
+        "(environment variable ConnectionStrings__RondiTrack).");
+
 // [1] OpenTelemetry: traces, metrics and logs. The OTLP exporter is only added when
 // OTEL_EXPORTER_OTLP_ENDPOINT is set, so tests and CI never need a dashboard.
 var otel = builder.Services.AddOpenTelemetry()
@@ -228,6 +236,11 @@ app.MapMeEndpoints();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<RondiTrackDbContext>();
+
+    // Apply pending migrations on startup so a fresh clone with only Docker gets its schema.
+    // See the README for why this is not safe with several replicas in production.
+    await db.Database.MigrateAsync();
+
     var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
     var inMemoryUsers = scope.ServiceProvider.GetRequiredService<InMemoryUserRepository>();
     var stokvelRepo = scope.ServiceProvider.GetRequiredService<IStokvelRepository>();
