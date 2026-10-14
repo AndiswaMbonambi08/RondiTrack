@@ -5,6 +5,7 @@ using RondiTrack.Data;
 using RondiTrack.Domain;
 using RondiTrack.Endpoints;
 using RondiTrack.ErrorHandling;
+using RondiTrack.Jobs;
 using RondiTrack.Services;
 using RondiTrack.Telemetry;
 using Scalar.AspNetCore;
@@ -66,6 +67,15 @@ builder.Logging.AddSimpleConsole(o => o.IncludeScopes = true);
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
 JwtOptions.EnsureValid(jwtOptions);
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+
+// 6.4: job settings are validated at startup too, so a bad value fails immediately and names the setting.
+var cycleCloseOptions = builder.Configuration.GetSection(CycleCloseOptions.SectionName).Get<CycleCloseOptions>() ?? new CycleCloseOptions();
+CycleCloseOptions.EnsureValid(cycleCloseOptions);
+builder.Services.Configure<CycleCloseOptions>(builder.Configuration.GetSection(CycleCloseOptions.SectionName));
+
+var housekeepingOptions = builder.Configuration.GetSection(HousekeepingOptions.SectionName).Get<HousekeepingOptions>() ?? new HousekeepingOptions();
+HousekeepingOptions.EnsureValid(housekeepingOptions);
+builder.Services.Configure<HousekeepingOptions>(builder.Configuration.GetSection(HousekeepingOptions.SectionName));
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -170,6 +180,9 @@ if (readyTimeoutSeconds > 0)
     });
 }
 
+// Time is a dependency: everything that needs "now" takes a TimeProvider. Tests swap in a fake.
+builder.Services.AddSingleton(TimeProvider.System);
+
 // Swapped to EF Core. Scoped because they depend on the Scoped DbContext.
 builder.Services.AddScoped<IStokvelRepository, EfStokvelRepository>();
 builder.Services.AddScoped<IContributionCycleRepository, EfContributionCycleRepository>();
@@ -179,17 +192,22 @@ builder.Services.AddScoped<IStokvelMemberRepository, EfStokvelMemberRepository>(
 builder.Services.AddScoped<ContributionQueryService>();
 builder.Services.AddScoped<MemberQueryService>();
 builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
-builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<HomeQueryService>();
 
-// Not swapped yet: a stated decision, not an oversight. See README.
+// Database-backed, so idempotency keys survive restarts and are shared by every replica.
+builder.Services.AddScoped<IIdempotencyStore, EfIdempotencyStore>();
+
+// Not swapped yet: a stated decision, not an oversight. Users are still mirrored in memory. See README.
 builder.Services.AddSingleton<InMemoryUserRepository>();
 builder.Services.AddScoped<IUserRepository, MirroringUserRepository>();
-builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 builder.Services.AddScoped<IStokvelService, StokvelService>();
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IUserCredentialStore, EfUserCredentialStore>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+// 6.4: background jobs. Both are safe to run on several replicas at once (see README).
+builder.Services.AddHostedService<CycleCloseJob>();
+builder.Services.AddHostedService<HousekeepingJob>();
 
 var app = builder.Build();
 
@@ -210,7 +228,9 @@ app.UseWhen(
     ctx => !ctx.Request.Path.StartsWithSegments("/health"),
     branch => branch.UseMiddleware<SaveChangesMiddleware>());
 
-if (app.Environment.IsDevelopment())
+// 6.4: the container runs as Production, so the docs are switched on by configuration, not only by environment.
+// Set Docs__Enabled=false to hide them (see "Before production" in the README).
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue("Docs:Enabled", false))
 {
     app.MapOpenApi().AllowAnonymous();
     app.MapScalarApiReference().AllowAnonymous();
@@ -233,55 +253,9 @@ app.MapPagedListEndpoints();
 app.MapPayoutVersionEndpoints();
 app.MapMeEndpoints();
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<RondiTrackDbContext>();
-
-    // Apply pending migrations on startup so a fresh clone with only Docker gets its schema.
-    // See the README for why this is not safe with several replicas in production.
-    await db.Database.MigrateAsync();
-
-    var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-    var inMemoryUsers = scope.ServiceProvider.GetRequiredService<InMemoryUserRepository>();
-    var stokvelRepo = scope.ServiceProvider.GetRequiredService<IStokvelRepository>();
-
-    var usersInDb = await db.Users.AsNoTracking().ToListAsync();
-
-    if (usersInDb.Count > 0)
-    {
-        // Not the first run: the database is the source of truth. The in-memory seed users get new
-        // Ids on every start, so swap them for the real rows. Ids then match the database, and users
-        // who registered earlier are known to the in-memory store again.
-        foreach (var seeded in (await inMemoryUsers.GetAllAsync()).ToList())
-            await inMemoryUsers.DeleteAsync(seeded.Id);
-        foreach (var existing in usersInDb)
-            await inMemoryUsers.AddAsync(existing);
-    }
-    else
-    {
-        var users = await userRepo.GetAllAsync();
-
-        // StokvelMembers has a foreign key to the Users table, so the users must exist there first.
-        db.Users.AddRange(users);
-        await db.SaveChangesAsync();
-
-        var activeUsers = users.Where(u => u.IsActive).ToList();
-
-        var stokvel = new Stokvel("Ubuntu Savings Circle", 500m);
-        stokvel.AddMember(activeUsers[0]);
-        stokvel.AddMember(activeUsers[1]);
-        await stokvelRepo.AddAsync(stokvel);
-
-        // The seed runs outside any HTTP request, so the SaveChangesMiddleware
-        // never fires for it, so save the membership rows directly here instead.
-        foreach (var memberId in stokvel.MemberIds)
-        {
-            db.StokvelMembers.Add(new RondiTrack.Persistence.Entities.StokvelMember(
-                stokvel.Id, memberId, RondiTrack.Persistence.Entities.StokvelMemberRole.Member, DateTime.UtcNow));
-        }
-        await db.SaveChangesAsync();
-    }
-}
+// Migrations + demo seed, under one advisory lock so replicas queue instead of racing.
+// See Data/DatabaseInitializer.cs and the README (--scale api=2).
+await DatabaseInitializer.InitializeAsync(app.Services, app.Configuration);
 
 app.Run();
 
