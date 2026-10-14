@@ -523,3 +523,8 @@ Idempotency-Key header not always registering). Not investigating further right 
 since the assignment doesn't require exhaustive test coverage, just demonstrating the
 core idempotency guarantee. Will revisit if the same issue blocks something required
 later.
+
+# Secrets
+.env
+.env.*
+!.env.example
