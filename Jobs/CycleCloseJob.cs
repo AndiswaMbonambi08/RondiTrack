@@ -170,43 +170,43 @@ public class CycleCloseJob : BackgroundService
         return await strategy.ExecuteAsync<CloseOutcome>(async token =>
         {
             db.ChangeTracker.Clear();
-            await using var tx = await db.Database.BeginTransactionAsync(token);
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
 
             // 1. Claim the close. One conditional UPDATE: the database, not C#, decides the winner.
             //    A concurrent runner blocks on the row until we commit, then matches 0 rows.
             var claimed = await db.ContributionCycles
                 .Where(c => c.Id == cycleId && c.ClosedAtUtc == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(c => c.ClosedAtUtc, nowUtc), token);
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.ClosedAtUtc, nowUtc), ct);
 
             if (claimed == 0)
             {
-                await tx.RollbackAsync(token);
+                await tx.RollbackAsync(ct);
                 return new CloseOutcome(false, 0, 0);
             }
 
             var cycle = await db.ContributionCycles.AsNoTracking()
                 .Where(c => c.Id == cycleId)
                 .Select(c => new { c.TargetAmount, c.EndDate })
-                .SingleAsync(token);
+                .SingleAsync(ct);
 
             // An impossible state (e.g. the stokvel is gone) throws here, rolling back the claim above.
             var contributionAmount = await db.Stokvels.AsNoTracking()
                 .Where(s => s.Id == stokvelId)
                 .Select(s => (decimal?)s.ContributionAmount)
-                .SingleOrDefaultAsync(token)
+                .SingleOrDefaultAsync(ct)
                 ?? throw new InvalidOperationException("The cycle's stokvel does not exist.");
 
             // 2. Arrears: every member who paid less than the stokvel's contribution amount.
             var memberIds = await db.StokvelMembers.AsNoTracking()
                 .Where(sm => sm.StokvelId == stokvelId)
                 .Select(sm => sm.UserId)
-                .ToListAsync(token);
+                .ToListAsync(ct);
 
             var paid = await db.Contributions.AsNoTracking()
                 .Where(c => c.ContributionCycleId == cycleId)
                 .GroupBy(c => c.UserId)
                 .Select(g => new { UserId = g.Key, Total = g.Sum(c => c.Amount) })
-                .ToDictionaryAsync(x => x.UserId, x => x.Total, token);
+                .ToDictionaryAsync(x => x.UserId, x => x.Total, ct);
 
             var arrears = new List<Arrear>();
             foreach (var memberId in memberIds)
@@ -228,13 +228,13 @@ public class CycleCloseJob : BackgroundService
             }
 
             var alreadyExists = await db.ContributionCycles
-                .AnyAsync(c => c.StokvelId == stokvelId && c.StartDate == start, token);
+                .AnyAsync(c => c.StokvelId == stokvelId && c.StartDate == start, ct);
             if (!alreadyExists)
                 db.ContributionCycles.Add(new ContributionCycle(
                     stokvelId, CycleCalendar.Label(end), cycle.TargetAmount, start, end));
 
-            await db.SaveChangesAsync(token);
-            await tx.CommitAsync(token);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
 
             return new CloseOutcome(true, arrears.Count, skipped);
         }, ct);
