@@ -29,9 +29,10 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__RondiTrack: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}
+      Seed__DemoPassword: ${SEED_DEMO_PASSWORD:?Set SEED_DEMO_PASSWORD in .env}
     ports:
       - "8080-8089:8080"
-     
+
 
 volumes:
   pgdata:
