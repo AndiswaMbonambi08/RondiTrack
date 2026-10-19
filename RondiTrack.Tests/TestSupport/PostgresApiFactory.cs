@@ -63,6 +63,11 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimit:ProcessPayout:TokenLimit", "100000");
         builder.UseSetting("RateLimit:ProcessPayout:TokensPerPeriod", "100000");
 
+        // The background jobs run on the real clock, so they stay off in tests. Job tests build
+        // the jobs themselves with a fake clock and call RunOnceAsync.
+        builder.UseSetting("CycleClose:Enabled", "false");
+        builder.UseSetting("Housekeeping:Enabled", "false");
+
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
     }
 
