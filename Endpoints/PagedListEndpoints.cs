@@ -16,6 +16,33 @@ public static class PagedListEndpoints
 {
     public static void MapPagedListEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapGet(ApiRoutes.Stokvels + "/{stokvelId:guid}/contributions",
+            async (Guid stokvelId, [AsParameters] MyContributionListQuery query, HttpContext http,
+                   IStokvelRepository stokvels, RondiTrackDbContext db, CancellationToken ct) =>
+            {
+                PageTokenCodec.ClampSize(query.PageSize);
+
+                var userId = http.User.GetUserId();
+                if (userId is null)
+                    return AuthProblems.Unauthorized(http);
+
+                _ = await stokvels.GetByIdAsync(stokvelId)
+                    ?? throw new NotFoundException("Stokvel not found.");
+
+                var page = await MyContributionQuery.ListAsync(db, stokvelId, userId.Value, query, ct);
+                return Results.Ok(page);
+            })
+            .WithSummary("The signed-in user's own contributions in one stokvel")
+            .WithDescription("""
+                Newest first, paged as { items, nextPageToken } (an empty nextPageToken means no more results).
+                Only the caller's own contributions are returned, so no other member's amount or id is exposed.
+                Money is integer cents; recordedAt is a UTC instant; status is Pending, Paid or Confirmed.
+                """)
+            .Produces<PagedResult<ContributionItemResponse>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .RequireAuthorization(Policies.StokvelMember);
+
         app.MapGet(ApiRoutes.Stokvels + "/{stokvelId:guid}/cycles/{cycleId:guid}/contributions",
             async (Guid stokvelId, Guid cycleId, [AsParameters] ContributionListQuery query,
                    IStokvelRepository stokvels, IContributionCycleRepository cycles,

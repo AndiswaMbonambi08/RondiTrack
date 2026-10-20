@@ -111,9 +111,29 @@ public static class DatabaseInitializer
 
         // One open cycle each, covering today, so the cycle-close job has something to do when it ends.
         var (start, end) = CycleCalendar.PeriodContaining(today, cycleOptions.CycleEndDay);
-        foreach (var stokvel in new[] { ubuntu, umoja })
-            db.ContributionCycles.Add(new ContributionCycle(
-                stokvel.Id, CycleCalendar.Label(end), stokvel.ContributionAmount, start, end));
+        var ubuntuCycle = new ContributionCycle(
+            ubuntu.Id, CycleCalendar.Label(end), ubuntu.ContributionAmount, start, end);
+        var umojaCycle = new ContributionCycle(
+            umoja.Id, CycleCalendar.Label(end), umoja.ContributionAmount, start, end);
+        db.ContributionCycles.AddRange(ubuntuCycle, umojaCycle);
+
+        // Two finished Umoja cycles WITHOUT dates (the cycle-close job ignores those), so Sipho has history.
+        var umojaAugust = new ContributionCycle(umoja.Id, "2026-08", umoja.ContributionAmount);
+        var umojaSeptember = new ContributionCycle(umoja.Id, "2026-09", umoja.ContributionAmount);
+        umojaAugust.MarkPayoutProcessed();
+        umojaSeptember.MarkPayoutProcessed();
+        db.ContributionCycles.AddRange(umojaAugust, umojaSeptember);
+
+        // Sipho's contributions in Umoja: all three statuses, a 10-cent one, and the midnight one:
+        // paid at 00:30 on 1 November in Johannesburg, which is 2026-10-31T22:30:00Z.
+        // Ubuntu has none, so Sipho still owes there; in Umoja he is paid up for the current cycle.
+        db.Contributions.AddRange(
+            new Contribution(umoja.Id, sipho.Id, umojaAugust.Id, 300m,
+                new DateTime(2026, 8, 28, 9, 15, 0, DateTimeKind.Utc), ContributionStatus.Confirmed),
+            new Contribution(umoja.Id, sipho.Id, umojaSeptember.Id, 0.10m,
+                new DateTime(2026, 9, 29, 14, 5, 0, DateTimeKind.Utc), ContributionStatus.Pending),
+            new Contribution(umoja.Id, sipho.Id, umojaCycle.Id, 300m,
+                new DateTime(2026, 10, 31, 22, 30, 0, DateTimeKind.Utc), ContributionStatus.Paid));
 
         // One SaveChanges: the whole seed is all-or-nothing.
         await db.SaveChangesAsync();
