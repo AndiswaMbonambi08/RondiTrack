@@ -1313,3 +1313,58 @@ TODO. A classmate clones the repo into a new folder and follows only this README
 
 - The red/green pull request, the peer test, pinned image tags, the two-replica log lines and the reuse-detection test are still to do (see the TODO markers above).
 - The README still contains older assignment sections. Statements that are no longer true must be corrected or removed: `dotnet run` on port 5051 in "Setup" and "Steps", the "in-memory" idempotency design, the "Assignment 5.1 status: partial completion" section, the `[will paste my output]` and `[PASTE YOUR REAL COUNT HERE]` placeholders, and any note that users or idempotency keys are still in memory.
+
+## Frontend
+
+> **Work in progress (Assignment 7.1).** Items 1 and 5 are final. The `web/` code is
+> partly done: money, date and role helpers (with tests), the generated API types and
+> `StokvelCard` are in. `ContributionCard`, the captured sample data and port 3000 are
+> still being finished.
+
+### 1. The useMemo note
+
+In `StokvelCard`, the tempting place was `formatCents(owedCents)` and `roleText(role)`,
+which run on every render. I didn't add `useMemo`: the React Compiler (enabled in
+`vite.config.ts`) memoizes the component's values automatically, and both calls are cheap
+and pure, so manual memoization would only add noise.
+
+### 2. How the role reaches the card
+
+The role comes from that stokvel's own entry in `GET /api/v1/me/home`
+(`HomeStokvelResponse.role`) and is passed to `StokvelCard` as part of its `entry` prop.
+There is no global "current user role", no role read from the token and no context, so
+two cards for the same person differ from their props alone: the same user is a Member
+of Ubuntu Savings Circle and the Treasurer of Umoja Family Fund. Hiding the Treasurer
+section is a convenience, not security: the API still refuses a Member who calls a
+treasurer-only endpoint with a 403, checked against the database.
+
+### 3. Status and role strings
+
+The API sends `role` as a plain `string`, so every comparison lives in one helper,
+`web/src/lib/roles.ts` (`isTreasurer`, `roleText`), covered by `roles.test.ts`
+(including a misspelling like `"Treasuer"`). The contribution status is different: it is
+a real enum on the API (`Pending`, `Paid`, `Confirmed`) and is published as a string
+enum, so the generated type is a union.
+
+### 4. Handoff gaps fixed in the API
+
+| Gap found | Fix | Test |
+|---|---|---|
+| No typed contributions list for the stokvel (the only list had no response schema) | `GET /api/v1/stokvels/{stokvelId}/contributions` returns `{ items, nextPageToken }`, the caller's own contributions only | `MyContributionsTests.List_ReturnsOnlyTheCallersOwnContributions` |
+| Amounts were `number`/`double` | List items carry `amountCents` as an integer | `MyContributionsTests.OpenApi_PublishesAmountCentsAsInteger`, `List_ReturnsIntegerCentsStatusAndCycleLabel` |
+| Contributions had no status | `Contribution.Status` (`Pending`, `Paid`, `Confirmed`), migration `AddContributionStatus` (existing rows become `Paid`) | `MyContributionsTests.List_ReturnsIntegerCentsStatusAndCycleLabel` |
+| Home cycle had no status or due date | `HomeCycleResponse` gained `Status` and `DueDate` | `HomeEndpointTests.MemberOfTwoStokvels_SeesBothWithRightRole_PaidAndOwed` |
+| `nextPayoutUtc` was `23:59:59Z`, which is 01:59 the next day in Johannesburg | Now the last moment of the month in the stokvel's time zone (`21:59:59Z`) | `HomeEndpointTests.MemberOfTwoStokvels_SeesBothWithRightRole_PaidAndOwed` |
+| Seed lacked sample cases | Seed now has all three statuses, a 10-cent contribution and the midnight contribution (`2026-10-31T22:30:00Z`) | Covered by running the seed in the integration suite |
+
+### 5. Running the frontend
+
+```powershell
+cd web
+npm install
+npm run generate:api   # with the API running (docker compose up --build)
+npm run dev
+```
+
+Checks, all from `web/`: `npm run typecheck`, `npm run lint`, `npx vitest run`,
+`npm run build`.
