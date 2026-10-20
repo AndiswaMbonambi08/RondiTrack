@@ -11,6 +11,10 @@ public record HomeStokvelResponse(
     HomeCycleResponse? CurrentCycle,   // null when the stokvel has no open cycle
     long PaidCents,                    // what the caller paid this cycle
     long OwedCents,                    // what the caller still owes this cycle
-    DateTime? NextPayoutUtc);          // last moment of the cycle's month, UTC; null when there is no open cycle
+    DateTime? NextPayoutUtc);          // UTC instant of the last moment of the cycle's month in the stokvel's time zone; null when there is no open cycle
 
-public record HomeCycleResponse(Guid Id, string Label);
+public record HomeCycleResponse(
+    Guid Id,
+    string Label,
+    string Status,                     // "Open" or "Closed" (closed by the cycle-close job)
+    DateOnly? DueDate);                // the cycle's end date, a calendar date; null for cycles without dates

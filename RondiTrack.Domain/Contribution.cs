@@ -1,9 +1,18 @@
-// A single member's payment toward one ContributionCycle. Now carries StokvelId
-// directly (not just via the cycle), so it has a real composite FK to
-// StokvelMember — this is the concrete answer to "how does a Contribution
-// reference a specific membership": through (StokvelId, UserId) together,
-// the same pair that identifies the StokvelMember row itself.
+// A single member's payment toward one ContributionCycle. Carries StokvelId directly,
+// so it has a real composite FK to StokvelMember: (StokvelId, UserId) is the same pair
+// that identifies the StokvelMember row itself.
+using System.Text.Json.Serialization;
+
 namespace RondiTrack.Domain;
+
+// Published to OpenAPI as a string enum, so the generated TypeScript type is a union.
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ContributionStatus
+{
+    Pending,
+    Paid,
+    Confirmed
+}
 
 public class Contribution
 {
@@ -13,6 +22,7 @@ public class Contribution
     public Guid ContributionCycleId { get; private set; }
     public decimal Amount { get; private set; }
     public DateTime RecordedAt { get; private set; }
+    public ContributionStatus Status { get; private set; }
 
     public RondiTrack.Persistence.Entities.StokvelMember? Member { get; private set; }
     public ContributionCycle? ContributionCycle { get; private set; }
@@ -30,5 +40,15 @@ public class Contribution
         ContributionCycleId = contributionCycleId;
         Amount = amount;
         RecordedAt = DateTime.UtcNow;
+        Status = ContributionStatus.Paid;   // a recorded contribution starts as Paid
+    }
+
+    // Used by the seed, so demo data can have a fixed instant and status.
+    public Contribution(Guid stokvelId, Guid userId, Guid contributionCycleId, decimal amount,
+                        DateTime recordedAtUtc, ContributionStatus status)
+        : this(stokvelId, userId, contributionCycleId, amount)
+    {
+        RecordedAt = DateTime.SpecifyKind(recordedAtUtc, DateTimeKind.Utc);
+        Status = status;
     }
 }

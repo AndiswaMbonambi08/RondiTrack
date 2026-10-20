@@ -70,6 +70,9 @@ public class RondiTrackDbContext : DbContext
         {
             b.HasKey(c => c.Id);
 
+            // Stored as text ("Pending", "Paid", "Confirmed"). The migration gives existing rows "Paid".
+            b.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
+
             // The composite FK answering the "how does Contribution reference
             // a specific membership" question from Phase 3: points at
             // StokvelMember's composite key using the same two columns.

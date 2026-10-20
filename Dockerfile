@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+## syntax=docker/dockerfile:1 (temporarily disabled)
 
 # ---- build stage ----
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build

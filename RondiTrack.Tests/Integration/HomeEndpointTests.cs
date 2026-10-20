@@ -116,16 +116,19 @@ public class HomeEndpointTests : IDisposable
         var a = home.Stokvels.Single(s => s.StokvelId == stokvelA);
         Assert.Equal("Member", a.Role);
         Assert.Equal(cycleA, a.CurrentCycle!.Id);
+        Assert.Equal("Open", a.CurrentCycle.Status);
+        Assert.Null(a.CurrentCycle.DueDate);   // cycles created through the API have no dates
         Assert.Equal(50000, a.PaidCents);
         Assert.Equal(0, a.OwedCents);
-        Assert.Equal(new DateTime(2026, 9, 30, 23, 59, 59, DateTimeKind.Utc), a.NextPayoutUtc);
+        // The last moment of September in Johannesburg (23:59:59 SAST) is 21:59:59Z.
+        Assert.Equal(new DateTime(2026, 9, 30, 21, 59, 59, DateTimeKind.Utc), a.NextPayoutUtc);
 
         var b = home.Stokvels.Single(s => s.StokvelId == stokvelB);
         Assert.Equal("Treasurer", b.Role);
         Assert.Equal(cycleB, b.CurrentCycle!.Id);
         Assert.Equal(0, b.PaidCents);
         Assert.Equal(50000, b.OwedCents);
-        Assert.Equal(new DateTime(2026, 10, 31, 23, 59, 59, DateTimeKind.Utc), b.NextPayoutUtc);
+        Assert.Equal(new DateTime(2026, 10, 31, 21, 59, 59, DateTimeKind.Utc), b.NextPayoutUtc);
     }
 
     [Fact]
