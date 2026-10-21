@@ -1368,3 +1368,39 @@ npm run dev
 
 Checks, all from `web/`: `npm run typecheck`, `npm run lint`, `npx vitest run`,
 `npm run build`.
+### Assignment 7.2 notes
+
+**1. StrictMode evidence.** TODO: paste the console output. With the cleanup in place the counts were schedule x2, cleanup x1, so one timer stays alive. With the cleanup commented out they were schedule x2, cleanup x0, so two timers were live and both would fire at midnight. StrictMode mounts, unmounts and remounts every effect in development, which exposes a missing cleanup.
+
+**2. Where the open/closed state lives.** It lives in `ContributionList`, because a group's own toggle and the Expand all button both need it, so it cannot stay inside each group. It is a record keyed by cycle id that holds only the user's overrides; the default (the Open cycle expanded, the rest collapsed) is computed. Keying by id means a new cycle opening, which shifts every group down one place, never expands the wrong group. The Expand all / Collapse all label is derived from the open groups, not stored.
+
+**3. Dependency array.** `useSaMidnightClock` depends on `[now]`, not `[]`. The effect schedules one timeout for the next Johannesburg midnight; when it fires it sets a new `now`, which re-runs the effect and schedules the next one. `[]` would schedule only once, and the countdown would stop updating after the first midnight.
+
+**4. Due-date decision.** The API sends the cycle's end date as a calendar date ("2026-10-31"). One function, `dueDateToDeadline`, turns it into the deadline: the instant the day ends in Johannesburg (2026-10-31T22:00:00Z), never `new Date("2026-10-31")`. South Africa is UTC+2 all year with no daylight saving, so the next midnight is computed with a fixed offset. If the device clock says "Due today" but the API says the cycle is Closed, the API wins and the Closed badge is shown.
+
+**5. StatusBadge design.** It takes a `kind` ('cycle' | 'contribution') as well as a status, because the same word can mean different things: a contribution that is Paid is one member's unconfirmed claim (info tone, dashed border, "Paid (unconfirmed)"), while a cycle that is PaidOut means the pot went to the recipient (violet tone, solid border, "Paid out"). Every badge has a word, an icon and a tone, and unknown values show as neutral badges with the raw value.
+
+**6. Contrast table (DevTools colour picker).**
+
+| Badge | Light | Dark |
+|---|---|---|
+| Open | TODO | TODO |
+| Closed | TODO | TODO |
+| Paid out | TODO | TODO |
+| Pending | TODO | TODO |
+| Paid (unconfirmed) | TODO | TODO |
+| Confirmed | TODO | TODO |
+| In arrears | TODO | TODO |
+| Unknown (neutral) | TODO | TODO |
+
+**7. The audit.** `npm audit` reported 7 high-severity findings, all in one dependency chain (`braces` -> `micromatch` -> `fast-glob` -> `@shadcn/registry` / `@ts-morph/common` -> `shadcn`): braces can be forced into stack exhaustion by deeply nested glob patterns. This code only runs on my machine, inside the `shadcn` CLI when I add components. It is a dev dependency, so it is never in the production bundle that runs in users' browsers. `npm audit --omit=dev` now reports 0 vulnerabilities. I did not run `npm audit fix --force`, because it would install `shadcn@1.0.0`, an old breaking version, and the fix isn't needed for production.
+
+**8. 360px screenshots, every group expanded.** TODO: add the light and dark screenshots.
+
+**9. Handoff gaps fixed in the API.**
+- `arrearsCents` added to `/me/home` (the caller's own arrears only), tested in `CyclesAndArrearsTests`.
+- `GET /api/v1/stokvels/{id}/cycles` added (status, due date, collected and amount due in cents; "amount due" is the cycle's target amount), tested in `CyclesAndArrearsTests`.
+- TODO: the cycle id on contribution list items, if you had to add it.
+- The seed now has Open, Closed and PaidOut cycles for Umoja, and Sipho is in arrears there.
+
+**Shared phone.** The theme is device-wide and not personal, so it can stay after logout. Pinned stokvels (Assignment 8.4) are personal, so on logout I must clear them from storage.
