@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RondiTrack.Data;
@@ -51,10 +51,20 @@ public sealed class HomeQueryService(
             .GroupBy(c => c.ContributionCycleId)
             .ToDictionary(g => g.Key, g => g.Sum(c => c.Amount));
 
+        // Only the caller's own arrears are read (recorded by the cycle-close job, already in cents).
+        var arrearsByStokvel = (await db.Arrears.AsNoTracking()
+                .Where(a => a.UserId == userId && stokvelIds.Contains(a.StokvelId))
+                .Select(a => new { a.StokvelId, a.ShortfallCents })
+                .ToListAsync(ct))
+            .GroupBy(a => a.StokvelId)
+            .ToDictionary(g => g.Key, g => g.Sum(a => a.ShortfallCents));
+
         var items = memberships.Select(m =>
         {
+            var arrears = arrearsByStokvel.GetValueOrDefault(m.Id);
+
             if (!currentByStokvel.TryGetValue(m.Id, out var cycle))
-                return new HomeStokvelResponse(m.Id, m.Name, m.Role.ToString(), null, 0, 0, null);
+                return new HomeStokvelResponse(m.Id, m.Name, m.Role.ToString(), null, 0, 0, arrears, null);
 
             var paid = paidByCycle.GetValueOrDefault(cycle.Id);
             var owed = Math.Max(0m, m.ContributionAmount - paid);
@@ -62,7 +72,7 @@ public sealed class HomeQueryService(
             return new HomeStokvelResponse(
                 m.Id, m.Name, m.Role.ToString(),
                 new HomeCycleResponse(cycle.Id, cycle.Label, cycle.ClosedAtUtc is null ? "Open" : "Closed", cycle.EndDate),
-                ToCents(paid), ToCents(owed),
+                ToCents(paid), ToCents(owed), arrears,
                 NextPayoutFromLabel(cycle.Label, zone));
         }).ToList();
 

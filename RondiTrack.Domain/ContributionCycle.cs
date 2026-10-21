@@ -1,4 +1,4 @@
-// A specific collection period for a stokvel: a target amount, a label identifying
+﻿// A specific collection period for a stokvel: a target amount, a label identifying
 // the period (e.g. "2026-09") and, for scheduled cycles, a start and end date.
 // Dates are calendar dates in the stokvel's time zone (Africa/Johannesburg), NOT instants.
 // The cycle-close job decides when a cycle has ended by converting EndDate to a UTC
@@ -80,6 +80,9 @@ public class ContributionCycle
             throw new ConflictException("This cycle's payout has already been processed.");
         Status = CycleStatus.PayoutProcessed;
     }
+
+    // Seed data only: gives demo data a cycle that the cycle-close job has already closed.
+    public void MarkClosedForSeed(DateTime closedAtUtc) => ClosedAtUtc = closedAtUtc;
 
     private void SetLabel(string label)
     {

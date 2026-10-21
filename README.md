@@ -1,4 +1,4 @@
-# RondiTrack
+﻿# RondiTrack
 RondiTrack is the foundation of a backend API for managing stokvels, rotating savings groups widely used in South Africa. Built with ASP.NET Core 10 Minimal APIs, it models the real-world rules of stokvels directly in code, ensuring invalid states are impossible rather than just checked later. The project focuses on domain modeling, HTTP contracts, and resource-oriented routing, laying the groundwork for a production-ready API.
 
 Minimal APIs were chosen over Controllers because they keep the project lightweight and focused. For an assignment centered on domain modeling and HTTP fundamentals, Minimal APIs reduce boilerplate, make routes explicit, and keep the logic close to the domain rules. This clarity helps demonstrate how the API enforces fairness and accountability in stokvels.
@@ -293,7 +293,7 @@ before applying it. Checked specifically that: each of the six tables was
 created (Users, Stokvels, StokvelMembers, ContributionCycles, Contributions,
 Payouts), StokvelMembers has a composite key on (StokvelId, UserId) rather
 than its own surrogate id, and no column was silently dropped or renamed
-compared to what the entity classes declare — a rename can look identical to
+compared to what the entity classes declare â€” a rename can look identical to
 a drop-and-add in the generated migration, so I compared property names in
 each entity file against the CreateTable columns line by line rather than
 trusting the diff visually.
@@ -303,13 +303,13 @@ EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10)).
 5 retries capped at 10 seconds each caps total wait around 50 seconds, short
 enough that a caller isn't left hanging indefinitely, long enough to ride out
 a brief network blip or a connection pool being temporarily exhausted during
-a deploy. This retries transient failures — a dropped connection, a timeout
+a deploy. This retries transient failures â€” a dropped connection, a timeout
 reaching the database. It deliberately does not retry something like a
 constraint violation or a business-rule conflict, since retrying an inherently
 wrong request would just fail again identically; that needs to surface
 immediately as a 409, not be silently retried.
 
-## Assignment 5.1 status — partial completion
+## Assignment 5.1 status â€” partial completion
 
 PostgreSQL is installed (via Docker) and confirmed reachable independently of
 the API (see PostgreSQL setup section above). User Secrets is configured.
@@ -319,7 +319,7 @@ Payout is modeled and PayoutService implements the explicit transaction.
 
 What is not yet confirmed working tonight: the initial migration has not
 been successfully generated and applied against the real database. Getting
-there surfaced three real EF Core mapping problems in a row — Stokvel's
+there surfaced three real EF Core mapping problems in a row â€” Stokvel's
 MemberIds (a computed, setter-less collection), and both Contribution and
 ContributionCycle needing a private parameterless constructor EF could use
 to materialize rows, since their only public constructors don't match a
@@ -340,7 +340,7 @@ claiming a green test run I have not actually seen.
 | Stokvels (all) | Yes | Yes | Yes | Yes | Yes | Code complete, migration not yet confirmed applied | N/A |
 | ContributionCycles (all) | Yes | Yes | N/A | Yes | Yes | Code complete, migration not yet confirmed applied | N/A |
 | Contributions (recording) | Yes | Yes | Yes | Yes | Yes | No (stated decision, see gap above) | N/A |
-| Payout processing | Yes | N/A | No | No (code written, not yet run against real DB) | Yes | Code complete, migration not yet confirmed applied | Not yet confirmed — test written, not yet run successfully |
+| Payout processing | Yes | N/A | No | No (code written, not yet run against real DB) | Yes | Code complete, migration not yet confirmed applied | Not yet confirmed â€” test written, not yet run successfully |
 
 ## Known gap
 
@@ -350,7 +350,7 @@ when actually run against the live PostgreSQL container. The code for all of
 this exists and is committed; the live confirmation is what's outstanding.
 
 ## StokvelMember's composite key (Assignment 5.2)
-StokvelMember carries real data of its own now — Role and JoinedAtUtc — so it
+StokvelMember carries real data of its own now â€” Role and JoinedAtUtc â€” so it
 gets a composite primary key on (StokvelId, UserId) rather than a surrogate
 Guid Id. Nobody looks this row up by an arbitrary id; they look it up by "this
 user's membership in this stokvel," which the pair already expresses
@@ -365,26 +365,26 @@ foreign-key constraint protecting the relationship, only convention.
 
 ## Replacing generic repository access
 Assignment 5.1's implementation never routed StokvelMember through the
-generic IRepository<T> pattern at all — a composite key made
+generic IRepository<T> pattern at all â€” a composite key made
 GetByIdAsync(Guid) meaningless the moment the join table existed, so access
 was always raw DbContext queries inside EfStokvelRepository. Today that's
 formalized into IStokvelMemberRepository, with a composite-key-aware
 GetAsync(stokvelId, userId) and GetByStokvelIdAsync(stokvelId), used wherever
 code needs one specific membership directly.
 
-## Migration review — reading an ALTER, not a CREATE
+## Migration review â€” reading an ALTER, not a CREATE
 This migration renames StokvelMembers.JoinedAt to JoinedAtUtc. The generator's
 default output was a DropColumn + AddColumn pair, which would silently
 discard every existing value in that column. I replaced it with
 migrationBuilder.RenameColumn(...) instead, preserving the data. I also
-checked the new foreign key constraints on Contributions (StokvelId+UserId →
-StokvelMembers, ContributionCycleId → ContributionCycles) to confirm neither
+checked the new foreign key constraints on Contributions (StokvelId+UserId â†’
+StokvelMembers, ContributionCycleId â†’ ContributionCycles) to confirm neither
 table was being dropped and recreated.
 
 ## Second relationship: ContributionCycle to Contribution
-Wired ContributionCycle ↔ Contribution rather than Stokvel ↔ ContributionCycle,
+Wired ContributionCycle â†” Contribution rather than Stokvel â†” ContributionCycle,
 since the N+1 endpoint needed this exact relationship to load Contributions
-for a cycle. Stokvel ↔ ContributionCycle was a fair alternative but nothing
+for a cycle. Stokvel â†” ContributionCycle was a fair alternative but nothing
 yet actually queries through it.
 
 ## N+1 measurement
@@ -412,7 +412,7 @@ because MemberIds is Ignore()'d entirely in the DbContext (a decision made in
 5.1), so Include was never an option for it. Lazy loading appears nowhere in
 RondiTrack: no proxies package is installed, and no UseLazyLoadingProxies()
 call exists. Without it, every navigation stays null until explicitly loaded,
-which is exactly why the naive N+1 demo had to manually re-query in a loop —
+which is exactly why the naive N+1 demo had to manually re-query in a loop â€”
 a more realistic cause of N+1 in a non-proxy EF codebase than accidental
 lazy-loading triggers.
 
@@ -430,7 +430,7 @@ endpoints pass asNoTracking: true explicitly.
 [will paste my output, once tested]
 
 Nothing in the existing test suite called `new Contribution(...)` directly or
-read StokvelMember.Id — StokvelUnitTests and StokvelServiceUnitTests only
+read StokvelMember.Id â€” StokvelUnitTests and StokvelServiceUnitTests only
 ever go through Stokvel.RecordContribution and StokvelService's public
 methods, both of which kept their exact signatures. The one real ripple from
 giving Contribution a StokvelId was internal: Stokvel.RecordContribution's
@@ -442,20 +442,20 @@ green without changes.
 
 | Area | Relationship modeled as real navigation | N+1 measured and fixed |
 |---|---|---|
-| StokvelMember ↔ User/Stokvel | Yes | N/A |
-| Contribution ↔ StokvelMember | Yes | N/A |
-| ContributionCycle ↔ Contribution | Yes | Yes (see above) |
-| Stokvel ↔ ContributionCycle | No (stated decision, not wired) | N/A |
+| StokvelMember â†” User/Stokvel | Yes | N/A |
+| Contribution â†” StokvelMember | Yes | N/A |
+| ContributionCycle â†” Contribution | Yes | Yes (see above) |
+| Stokvel â†” ContributionCycle | No (stated decision, not wired) | N/A |
 
 ## Known gap
-Stokvel ↔ ContributionCycle stays a bare Guid FK, not a real navigation —
+Stokvel â†” ContributionCycle stays a bare Guid FK, not a real navigation â€”
 nothing yet queries through it, so wiring it added no proven value today.
 Payout's StokvelId + RecipientUserId could similarly become a composite FK to
 StokvelMember, following the exact same pattern as Contribution, but doing so
 wasn't required by anything built today and was left as a stated gap rather
 than extra scope.
 
-# Assignment 5.3 — Database Integrity, Query Behaviour and Definition of Done
+# Assignment 5.3 â€” Database Integrity, Query Behaviour and Definition of Done
 
 ## Audit results
 
@@ -642,7 +642,7 @@ The test database should ideally be isolated from the development database in a 
 | Duplicate payout invariant checked                                    | SQL returned 0 duplicate groups                                                        | Done                      |
 | Database relationships and foreign keys exist                         | EF migration applied successfully                                                      | Done                      |
 | Database save occurs before response is sent                          | `SaveChangesMiddleware` updated                                                        | Done                      |
-| In-memory users satisfy database FK                                   | `MirroringUserRepository` writes mirror rows                                           | Done — temporary solution |
+| In-memory users satisfy database FK                                   | `MirroringUserRepository` writes mirror rows                                           | Done â€” temporary solution |
 | Users are fully EF Core-backed                                        | Not yet implemented                                                                    | **Not done**              |
 | Startup seed is isolated from integration tests                       | Tests still share development database                                                 | **Not done**              |
 | Before/after EXPLAIN plans are recorded                               | `docs/query.sql` was missing, so plans were not captured                               | **Not done**              |
@@ -661,22 +661,22 @@ The test database should ideally be isolated from the development database in a 
 
 ## Dependency direction and lifetimes (Assignment 5.4)
 
-Dependencies point inward: Api → Infrastructure → Domain. Domain references nothing else
+Dependencies point inward: Api â†’ Infrastructure â†’ Domain. Domain references nothing else
 (no ASP.NET Core, no EF Core), so HTTP and database concerns can't leak into the rules.
 
 | Service | Lifetime | Why |
 |---|---|---|
 | RondiTrackDbContext | Scoped (AddDbContext default) | One unit of work per request; also what SaveChangesMiddleware saves |
-| IStokvelRepository → EfStokvelRepository | Scoped | Wraps the scoped DbContext |
-| IContributionCycleRepository → EfContributionCycleRepository | Scoped | Wraps the scoped DbContext |
-| IPayoutRepository → EfPayoutRepository | Scoped | Wraps the scoped DbContext |
-| IStokvelMemberRepository → EfStokvelMemberRepository | Scoped | Wraps the scoped DbContext |
-| IUserRepository → MirroringUserRepository | Scoped | Per-request wrapper over the singleton in-memory store |
-| IStokvelService → StokvelService | Scoped | Depends on scoped repositories |
-| IPayoutService → PayoutService | Scoped | Depends on scoped repositories |
+| IStokvelRepository â†’ EfStokvelRepository | Scoped | Wraps the scoped DbContext |
+| IContributionCycleRepository â†’ EfContributionCycleRepository | Scoped | Wraps the scoped DbContext |
+| IPayoutRepository â†’ EfPayoutRepository | Scoped | Wraps the scoped DbContext |
+| IStokvelMemberRepository â†’ EfStokvelMemberRepository | Scoped | Wraps the scoped DbContext |
+| IUserRepository â†’ MirroringUserRepository | Scoped | Per-request wrapper over the singleton in-memory store |
+| IStokvelService â†’ StokvelService | Scoped | Depends on scoped repositories |
+| IPayoutService â†’ PayoutService | Scoped | Depends on scoped repositories |
 | ContributionQueryService, MemberQueryService | Scoped | Query the scoped DbContext |
 | InMemoryUserRepository | Singleton | Shared user store that outlives requests |
-| IIdempotencyStore → InMemoryIdempotencyStore | Singleton | Keys must be remembered across requests |
+| IIdempotencyStore â†’ InMemoryIdempotencyStore | Singleton | Keys must be remembered across requests |
 
 No singleton depends on a scoped service, so there are no captive dependencies.
 
@@ -900,7 +900,7 @@ The new tests cover: no token returns 401 problem JSON; non-member 404, member w
 
 ## Run the Aspire dashboard (laptop only, unsecured, never deploy it)
 docker run --rm -d --name aspire-dashboard -p 18888:18888 -p 4317:18889 -e ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true mcr.microsoft.com/dotnet/aspire-dashboard:latest
-$env:OTEL_EXPORTER_OTLP_ENDPOINT = “http://localhost:4317”
+$env:OTEL_EXPORTER_OTLP_ENDPOINT = â€œhttp://localhost:4317â€
 dotnet run
 
 Open http://localhost:18888. Telemetry is exported only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, so tests and CI need no dashboard. Service name: `ronditrack-api`.
@@ -968,7 +968,7 @@ Explanation: I did enable retry-on-failure in Week 5 (5 retries, max delay 10 s)
 
 ## Log excerpt (no personal or secret data)
 Login succeeded. UserId: 173708fa-0b3a-4654-a361-d30342fb2933, FamilyId: 5d6cca97-2637-4d7f-ad98-31b72825f416
-Executed DbCommand ... INSERT INTO “Payouts” ... VALUES (@p0, @p1, ...) (TraceId 95b199c01a4950eb0904410fb9d0643c)
+Executed DbCommand ... INSERT INTO â€œPayoutsâ€ ... VALUES (@p0, @p1, ...) (TraceId 95b199c01a4950eb0904410fb9d0643c)
 Authorization refused. Result: not_found, UserId: 5216d034-71a7-4aae-be61-9d547a1fed02
 
 
@@ -1368,3 +1368,59 @@ npm run dev
 
 Checks, all from `web/`: `npm run typecheck`, `npm run lint`, `npx vitest run`,
 `npm run build`.
+
+### Assignment 7.2 notes
+
+**1. StrictMode evidence.** With the cleanup in place the console showed `schedule` x6 and `cleanup` x3: the page has three countdowns (two stokvel cards and the Open cycle header), and StrictMode mounts, unmounts and remounts each one, so each is scheduled twice and cleaned up once, leaving exactly one live timer per countdown. With the whole cleanup commented out it showed `schedule` x6 and `cleanup` x0, so every countdown ended up with two live timers, and both would fire at midnight. StrictMode mounts, unmounts and remounts every effect in development, which exposes a missing cleanup.
+
+![With cleanup](docs/screenshots/strictmode-with-cleanup.png)
+![Without cleanup](docs/screenshots/strictmode-without-cleanup.png)
+
+**2. Where the open/closed state lives.** It lives in `ContributionList`, because a group's own toggle and the Expand all button both need it, so it cannot stay inside each group. It is a record keyed by cycle id that holds only the user's overrides; the default (the Open cycle expanded, the rest collapsed) is computed. Keying by id means a new cycle opening, which shifts every group down one place, never expands the wrong group. The Expand all / Collapse all label is derived from the open groups, not stored.
+
+**3. Dependency array.** `useSaMidnightClock` depends on `[now]`, not `[]`. The effect schedules one timeout for the next Johannesburg midnight; when it fires it sets a new `now`, which re-runs the effect and schedules the next one. `[]` would schedule only once, and the countdown would stop updating after the first midnight.
+
+**4. Due-date decision.** The API sends the cycle's end date as a calendar date ("2026-10-31"). One function, `dueDateToDeadline`, turns it into the deadline: the instant the day ends in Johannesburg (2026-10-31T22:00:00Z), never `new Date("2026-10-31")`. South Africa is UTC+2 all year with no daylight saving, so the next midnight is computed with a fixed offset. If the device clock says "Due today" but the API says the cycle is Closed, the API wins and the Closed badge is shown, because the server's cycle-close job decides what is closed, not the user's clock.
+
+**5. StatusBadge design.** It takes a `kind` ('cycle' | 'contribution') as well as a status, because the same word can mean different things: a contribution that is Paid is one member's unconfirmed claim (info tone, dashed border, "Paid (unconfirmed)"), while a cycle that is PaidOut means the pot went to the recipient (violet tone, solid border, "Paid out"). Every badge has a word, an icon and a tone, and unknown values show as neutral badges with the raw value.
+
+**6. Contrast table** (text contrast measured in the browser with every cycle expanded; minimum is 4.5:1).
+
+| Badge | Light | Dark |
+|---|---|---|
+| Open | 8.79 | 9.47 |
+| Closed | 16.44 | 14.50 |
+| Paid out | 9.15 | 9.62 |
+| Pending | 8.20 | TODO |
+| Paid (unconfirmed) | 8.79 | 9.47 |
+| Confirmed | 9.17 | TODO |
+| In arrears | 8.44 | 10.02 |
+| Unknown (neutral, "Frozen") | 16.44 | TODO |
+
+The disabled Treasurer buttons ("Close cycle", "Record payout") measured 17.18 in light and 14.23 in dark before their disabled opacity. Disabled controls are exempt from WCAG 1.4.3.
+
+**7. The audit.** `npm audit` reported 7 high-severity findings, all in one dependency chain (`braces` -> `micromatch` -> `fast-glob` -> `@shadcn/registry` / `@ts-morph/common` -> `shadcn`): braces can be forced into stack exhaustion by deeply nested glob patterns. This code only runs on my machine, inside the `shadcn` CLI when I add components. It is a dev dependency, so it is never in the production bundle that runs in users' browsers. `npm audit --omit=dev` now reports 0 vulnerabilities. I did not run `npm audit fix --force`, because it would install `shadcn@1.0.0`, an old breaking version, and the fix isn't needed for production.
+
+**8. 360px screenshots, every group expanded.**
+
+![360px light](docs/screenshots/360-light.png)
+![360px dark](docs/screenshots/360-dark.png)
+
+**9. Handoff gaps fixed in the API.**
+- `arrearsCents` added to `/me/home` (the caller's own arrears only), tested in `CyclesAndArrearsTests`.
+- `GET /api/v1/stokvels/{id}/cycles` added (status, due date, collected and amount due in cents; "amount due" is the cycle's target amount), tested in `CyclesAndArrearsTests`.
+- The cycle id (`cycleId`) and `cycleLabel` are on every contribution list item, tested in `MyContributionsTests`.
+- The seed now has Open, Closed and PaidOut cycles for Umoja, and Sipho is in arrears there.
+
+**Checks run before hand-in.** `npm run typecheck`, `npm run lint`, `npm run build` pass; `npx vitest run` passes (28 tests); `dotnet test` passes (101 tests); `npm audit --omit=dev` finds 0 vulnerabilities.
+
+**Shared phone.** The theme is device-wide and not personal, so it can stay after logout. Pinned stokvels (Assignment 8.4) are personal, so on logout I must clear them from storage.
+
+### Why is there a Jobs folder?
+
+Some work in the app has to happen by itself, at a certain time, with nobody clicking anything. A "job" is a small program that wakes up on a schedule, does one chore, and goes back to sleep, like a cleaner who comes in after closing time.
+
+- **The cycle-close job** is the "end of the month" chore. When a cycle's due date has passed, it closes that cycle, writes down how much each member who underpaid still owes (their arrears), and opens the next cycle.
+- **The housekeeping job** is the tidy-up chore. It deletes old leftovers, such as expired idempotency records and tokens, so the database does not fill with junk.
+
+Why this matters for 7.2: the "In arrears" amount on a card comes from the cycle-close job. The website only shows that number; it never works out who owes what, because the server's job and clock decide that.

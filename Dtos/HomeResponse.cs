@@ -1,4 +1,4 @@
-// The signed-in user's home screen. Money is integer cents so the client never rounds.
+﻿// The signed-in user's home screen. Money is integer cents so the client never rounds.
 // Nothing here identifies another member: no member ids and no other members' amounts.
 namespace RondiTrack.Dtos;
 
@@ -11,6 +11,7 @@ public record HomeStokvelResponse(
     HomeCycleResponse? CurrentCycle,   // null when the stokvel has no open cycle
     long PaidCents,                    // what the caller paid this cycle
     long OwedCents,                    // what the caller still owes this cycle
+    long ArrearsCents,                 // the caller's OWN arrears in this stokvel (0 = none)
     DateTime? NextPayoutUtc);          // UTC instant of the last moment of the cycle's month in the stokvel's time zone; null when there is no open cycle
 
 public record HomeCycleResponse(

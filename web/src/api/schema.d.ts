@@ -76,6 +76,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stokvels/{stokvelId}/contributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in user's own contributions in one stokvel
+         * @description Newest first, paged as { items, nextPageToken } (an empty nextPageToken means no more results).
+         *     Only the caller's own contributions are returned, so no other member's amount or id is exposed.
+         *     Money is integer cents; recordedAt is a UTC instant; status is Pending, Paid or Confirmed.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    PageSize?: number;
+                    PageToken?: string;
+                };
+                header?: never;
+                path: {
+                    stokvelId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PagedResultOfContributionItemResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stokvels/{stokvelId}/cycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every cycle of one stokvel, newest first
+         * @description Status is Open, Closed (closed by the cycle-close job) or PaidOut. dueDate is the cycle's end date
+         *     as a calendar date (null for undated cycles). collectedCents is everything recorded against the
+         *     cycle; amountDueCents is the cycle's target amount. Money is integer cents.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    stokvelId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CycleSummaryResponse"][];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stokvels/{stokvelId}/cycles/{cycleId}/contributions": {
         parameters: {
             query?: never;
@@ -1410,6 +1526,18 @@ export interface components {
             /** Format: double */
             targetAmount: number;
         };
+        ContributionItemResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            amountCents: number;
+            status: components["schemas"]["ContributionStatus"];
+            /** Format: date-time */
+            recordedAt: string;
+            /** Format: uuid */
+            cycleId: string;
+            cycleLabel: string;
+        };
         ContributionResponse: {
             /** Format: uuid */
             id: string;
@@ -1423,11 +1551,31 @@ export interface components {
             amount: number;
             /** Format: date-time */
             recordedAt: string;
+            /** Format: int64 */
+            amountCents: number;
+            status: components["schemas"]["ContributionStatus"];
+        };
+        /** @enum {unknown} */
+        ContributionStatus: "Pending" | "Paid" | "Confirmed";
+        CycleSummaryResponse: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            status: string;
+            /** Format: date */
+            dueDate: null | string;
+            /** Format: int64 */
+            collectedCents: number;
+            /** Format: int64 */
+            amountDueCents: number;
         };
         HomeCycleResponse: {
             /** Format: uuid */
             id: string;
             label: string;
+            status: string;
+            /** Format: date */
+            dueDate: null | string;
         };
         HomeResponse: {
             /** Format: date-time */
@@ -1444,6 +1592,8 @@ export interface components {
             paidCents: number;
             /** Format: int64 */
             owedCents: number;
+            /** Format: int64 */
+            arrearsCents: number;
             /** Format: date-time */
             nextPayoutUtc: null | string;
         };
@@ -1455,6 +1605,10 @@ export interface components {
             accessToken: string;
             /** Format: int32 */
             expiresInSeconds: number;
+        };
+        PagedResultOfContributionItemResponse: {
+            items: components["schemas"]["ContributionItemResponse"][];
+            nextPageToken: string;
         };
         PayoutResponse: {
             /** Format: uuid */
