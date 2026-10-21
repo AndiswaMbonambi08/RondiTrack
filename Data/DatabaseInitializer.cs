@@ -1,4 +1,4 @@
-// Startup work: apply migrations, then (if Seed:Enabled) create the demo data.
+﻿// Startup work: apply migrations, then (if Seed:Enabled) create the demo data.
 // Both run under one PostgreSQL advisory lock, so with `--scale api=2` the replicas queue up instead
 // of racing: the second one waits, then finds the users already there and only syncs its in-memory store.
 // The lock is session-level, so it is always released explicitly before the connection goes back to the pool.
@@ -117,11 +117,14 @@ public static class DatabaseInitializer
             umoja.Id, CycleCalendar.Label(end), umoja.ContributionAmount, start, end);
         db.ContributionCycles.AddRange(ubuntuCycle, umojaCycle);
 
-        // Two finished Umoja cycles WITHOUT dates (the cycle-close job ignores those), so Sipho has history.
+        // Umoja history, one cycle of each kind: August is PaidOut (the pot went to the recipient),
+        // September is Closed (closed by the cycle-close job, Sipho short), October is the Open one above.
+        // Both older cycles are WITHOUT dates (the cycle-close job ignores those).
         var umojaAugust = new ContributionCycle(umoja.Id, "2026-08", umoja.ContributionAmount);
         var umojaSeptember = new ContributionCycle(umoja.Id, "2026-09", umoja.ContributionAmount);
+        var septemberClosedAtUtc = new DateTime(2026, 10, 1, 0, 5, 0, DateTimeKind.Utc);
         umojaAugust.MarkPayoutProcessed();
-        umojaSeptember.MarkPayoutProcessed();
+        umojaSeptember.MarkClosedForSeed(septemberClosedAtUtc);
         db.ContributionCycles.AddRange(umojaAugust, umojaSeptember);
 
         // Sipho's contributions in Umoja: all three statuses, a 10-cent one, and the midnight one:
@@ -134,6 +137,10 @@ public static class DatabaseInitializer
                 new DateTime(2026, 9, 29, 14, 5, 0, DateTimeKind.Utc), ContributionStatus.Pending),
             new Contribution(umoja.Id, sipho.Id, umojaCycle.Id, 300m,
                 new DateTime(2026, 10, 31, 22, 30, 0, DateTimeKind.Utc), ContributionStatus.Paid));
+
+        // Sipho is in arrears in Umoja: September needed R 300,00 and he paid R 0,10 = 29 990 cents short.
+        // Same shape the cycle-close job records.
+        db.Arrears.Add(new Arrear(umojaSeptember.Id, umoja.Id, sipho.Id, 29990, septemberClosedAtUtc));
 
         // One SaveChanges: the whole seed is all-or-nothing.
         await db.SaveChangesAsync();
