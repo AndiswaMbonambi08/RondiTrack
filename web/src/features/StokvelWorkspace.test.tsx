@@ -9,6 +9,9 @@ import { formatCents } from '../lib/money'
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const json = (b: unknown) => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
 
+// en-ZA currency uses non-breaking spaces; Testing Library normalizes the DOM text but not our string.
+const money = (cents: number) => formatCents(cents).replace(/\s/g, ' ')
+
 const MABENA = { id: 'mabena', name: 'Mabena Family', cents: 111100 }
 const SOWETO = { id: 'soweto', name: 'Soweto Teachers', cents: 777700 }
 
@@ -39,17 +42,17 @@ describe('switching stokvels', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(<QueryClientProvider client={client}><StokvelWorkspace /></QueryClientProvider>)
 
-    expect((await screen.findAllByText(formatCents(MABENA.cents))).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(money(MABENA.cents))).length).toBeGreaterThan(0)
     expect(screen.getByText('Mabena Family', { selector: 'h2' })).toBeInTheDocument()
 
     await userEvent.selectOptions(screen.getByLabelText('Stokvel'), 'soweto')
 
     // immediately after the switch: no Mabena name, no Mabena amount, the skeleton instead
-    expect(screen.queryByText(formatCents(MABENA.cents))).not.toBeInTheDocument()
+    expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
     expect(screen.queryByText('Mabena Family', { selector: 'h2' })).not.toBeInTheDocument()
     expect(screen.getByTestId('stokvel-skeleton')).toBeInTheDocument()
 
-    expect((await screen.findAllByText(formatCents(SOWETO.cents))).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(money(SOWETO.cents))).length).toBeGreaterThan(0)
     expect(screen.getByText('Soweto Teachers', { selector: 'h2' })).toBeInTheDocument()
   })
 })

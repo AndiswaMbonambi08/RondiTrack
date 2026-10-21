@@ -9,7 +9,7 @@ describe('parseRetryAfter', () => {
     expect(parseRetryAfter('Wed, 21 Oct 2026 07:28:30 GMT', now)).toBe(30))
   it('returns 0 for a date in the past', () =>
     expect(parseRetryAfter('Wed, 21 Oct 2026 07:00:00 GMT', now)).toBe(0))
-  it.each(['soon', '-5', '12abc', '', '2026', 'Wed, 99 Foo 2026 99:99:99 GMT'])(
+  it.each(['soon', '-5', '12abc', '', '1.5', 'Wed, 99 Foo 2026 99:99:99 GMT'])(
     'returns null for garbage %j', (input) => expect(parseRetryAfter(input, now)).toBeNull())
   it('returns null when the header is missing', () => expect(parseRetryAfter(null, now)).toBeNull())
 })

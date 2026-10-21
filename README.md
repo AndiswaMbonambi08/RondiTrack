@@ -1440,13 +1440,13 @@ Failing output with `return doRefresh()` instead of `refreshing ??= ...`:
     
      RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
     
-     â¯ src/auth/session.test.ts (5 tests | 3 failed) 396ms
+     â¯ src/auth/session.test.ts (5 tests | 3 failed) 334ms
        â¯ session (5)
-         Ã— five parallel 401s cause exactly one refresh 123ms
-         Ã— a later expiry starts a new refresh 59ms
-         Ã— a failed refresh signs out once and retries nothing 100ms
-         âœ“ no token means no loop 24ms
-         âœ“ a POST body survives the retry 86ms
+         Ã— five parallel 401s cause exactly one refresh 90ms
+         Ã— a later expiry starts a new refresh 58ms
+         Ã— a failed refresh signs out once and retries nothing 25ms
+         âœ“ no token means no loop 22ms
+         âœ“ a POST body survives the retry 130ms
     
     âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 3 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
     
@@ -1503,8 +1503,8 @@ Failing output with `return doRefresh()` instead of `refreshing ??= ...`:
     
      Test Files  1 failed (1)
           Tests  3 failed | 2 passed (5)
-       Start at  01:07:45
-       Duration  22.14s (environment 77%, setup 10%, transform 10%, tests 2%)
+       Start at  01:19:21
+       Duration  9.93s (environment 80%, setup 11%, tests 4%, worker 4%, transform 1%)
     
 
 Passing output with the line restored:
@@ -1512,12 +1512,12 @@ Passing output with the line restored:
     
      RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
     
-     âœ“ src/auth/session.test.ts (5 tests) 319ms
+     âœ“ src/auth/session.test.ts (5 tests) 193ms
     
      Test Files  1 passed (1)
           Tests  5 passed (5)
-       Start at  01:08:21
-       Duration  9.03s (environment 81%, setup 13%, tests 4%, transform 1%, worker 1%)
+       Start at  01:19:41
+       Duration  5.75s (environment 85%, setup 9%, tests 4%, worker 1%, transform 1%)
     
 
 ## Stokvel switch proof
@@ -1526,146 +1526,52 @@ Failing output with `placeholderData: keepPreviousData` added to `useContributio
     
      RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
     
-     â¯ src/features/StokvelWorkspace.test.tsx (1 test | 1 failed) 1230ms
+     â¯ src/features/StokvelWorkspace.test.tsx (1 test | 1 failed) 977ms
        â¯ switching stokvels (1)
-         Ã— never shows the previous stokvel contributions after a switch 1184ms
+         Ã— never shows the previous stokvel contributions after a switch 972ms
     
     âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 1 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
     
      FAIL  src/features/StokvelWorkspace.test.tsx > switching stokvels > never shows the previous stokvel contributions after a switch
-    TestingLibraryElementError: Unable to find an element with the text: R 1 111,00 (normalized from 'RÂ 1Â 111,00'). This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+    AssertionError: expected [ <p â€¦(1)></p>, <span â€¦(1)></span> ] to have a length of +0 but got 2
     
-    Ignored nodes: comments, script, style
-    <body>
-      <div>
-        <div
-          class="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
-        >
-          <header
-            class="bg-slate-800 text-white"
-          >
-            <div
-              class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3"
-            >
-              <h1
-                class="text-lg font-bold"
-              >
-                RondiTrack
-              </h1>
-              <div
-                class="flex items-center gap-3"
-              >
-                <div
-                  class="flex items-center gap-2 text-sm"
-                >
-                  <label
-                    for="stokvel-switch"
-                  >
-                    Stokvel
-                  </label>
-                  <select
-                    class="rounded bg-slate-700 px-2 py-1.5 text-white"
-                    id="stokvel-switch"
-                  >
-                    <option
-                      value="mabena"
-                    >
-                      Mabena Family
-                    </option>
-                    <option
-                      value="soweto"
-                    >
-                      Soweto Teachers
-                    </option>
-                  </select>
-                </div>
-                <button
-                  class="rounded bg-slate-600 px-3 py-1.5 text-sm hover:bg-slate-500"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
-          </header>
-          <main
-            class="mx-auto max-w-5xl p-6"
-          >
-            <section>
-              <div
-                class="rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900 flex items-center justify-between gap-4"
+    - Expected
+    + Received
+    
+    - 0
+    + 2
+    
+     â¯ src/features/StokvelWorkspace.test.tsx:51:56
+         49|
+         50|     // immediately after the switch: no Mabena name, no Mabena amount,â€¦
+         51|     expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
+           |                                                        ^
+         52|     expect(screen.queryByText('Mabena Family', { selector: 'h2' })).noâ€¦
+         53|     expect(screen.getByTestId('stokvel-skeleton')).toBeInTheDocument()
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[1/1]âŽ¯
+    
+    
+     Test Files  1 failed (1)
+          Tests  1 failed (1)
+       Start at  01:20:01
+       Duration  9.16s (environment 58%, setup 15%, tests 12%, import 10%, worker 3%, transform 3%)
+    
 
 Passing output without it:
 
     
      RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
     
-     â¯ src/features/StokvelWorkspace.test.tsx (1 test | 1 failed) 1320ms
-       â¯ switching stokvels (1)
-         Ã— never shows the previous stokvel contributions after a switch 1306ms
+     âœ“ src/features/StokvelWorkspace.test.tsx (1 test) 1062ms
+       âœ“ switching stokvels (1)
+         âœ“ never shows the previous stokvel contributions after a switch 1059ms
     
-    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 1 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
+     Test Files  1 passed (1)
+          Tests  1 passed (1)
+       Start at  01:20:18
+       Duration  7.11s (environment 59%, tests 16%, import 13%, setup 9%, transform 3%, worker 1%)
     
-     FAIL  src/features/StokvelWorkspace.test.tsx > switching stokvels > never shows the previous stokvel contributions after a switch
-    TestingLibraryElementError: Unable to find an element with the text: R 1 111,00 (normalized from 'RÂ 1Â 111,00'). This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
-    
-    Ignored nodes: comments, script, style
-    <body>
-      <div>
-        <div
-          class="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
-        >
-          <header
-            class="bg-slate-800 text-white"
-          >
-            <div
-              class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3"
-            >
-              <h1
-                class="text-lg font-bold"
-              >
-                RondiTrack
-              </h1>
-              <div
-                class="flex items-center gap-3"
-              >
-                <div
-                  class="flex items-center gap-2 text-sm"
-                >
-                  <label
-                    for="stokvel-switch"
-                  >
-                    Stokvel
-                  </label>
-                  <select
-                    class="rounded bg-slate-700 px-2 py-1.5 text-white"
-                    id="stokvel-switch"
-                  >
-                    <option
-                      value="mabena"
-                    >
-                      Mabena Family
-                    </option>
-                    <option
-                      value="soweto"
-                    >
-                      Soweto Teachers
-                    </option>
-                  </select>
-                </div>
-                <button
-                  class="rounded bg-slate-600 px-3 py-1.5 text-sm hover:bg-slate-500"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
-          </header>
-          <main
-            class="mx-auto max-w-5xl p-6"
-          >
-            <section>
-              <div
-                class="rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900 flex items-center justify-between gap-4"
 
 Money: the API sends `amountInCents` (integers), because `0.1 + 0.2` is `0.30000000000000004` in JSON numbers, so rands as decimals would drift.
 
