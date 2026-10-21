@@ -4,8 +4,8 @@
  * Why refresh must be single-flight for this API: the Week 6 API rotates the refresh cookie on
  * every /auth/refresh and detects reuse. If five requests fail together and each sends its own
  * refresh with the same cookie, the first rotates it and the other four present a spent token,
- * which the API answers with an error or treats as theft. One shared refresh per tab means the
- * cookie is only ever presented once. (Edit this to match what YOUR check 5 showed.)
+ * which AuthService.RefreshAsync treats as a replay: 401, and the whole token family is revoked, so
+ * the member is signed out everywhere. One shared refresh per tab presents the cookie only once.
  */
 import { ApiError } from '../api/apiError'
 
