@@ -1,3 +1,4 @@
+﻿using Microsoft.EntityFrameworkCore;
 using RondiTrack.Authorization;
 using RondiTrack.Data;
 using RondiTrack.Domain;
@@ -14,6 +15,9 @@ public record MemberListItem(Guid UserId, DateTime JoinedAtUtc, int Role);
 
 public static class PagedListEndpoints
 {
+    private static long ToCents(decimal amount) =>
+        (long)decimal.Round(amount * 100m, MidpointRounding.AwayFromZero);
+
     public static void MapPagedListEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet(ApiRoutes.Stokvels + "/{stokvelId:guid}/contributions",
@@ -40,6 +44,48 @@ public static class PagedListEndpoints
                 """)
             .Produces<PagedResult<ContributionItemResponse>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .RequireAuthorization(Policies.StokvelMember);
+
+        app.MapGet(ApiRoutes.Stokvels + "/{stokvelId:guid}/cycles",
+            async (Guid stokvelId, IStokvelRepository stokvels, RondiTrackDbContext db, CancellationToken ct) =>
+            {
+                _ = await stokvels.GetByIdAsync(stokvelId)
+                    ?? throw new NotFoundException("Stokvel not found.");
+
+                var cycles = await db.ContributionCycles.AsNoTracking()
+                    .Where(c => c.StokvelId == stokvelId)
+                    .Select(c => new { c.Id, c.Label, c.Status, c.ClosedAtUtc, c.EndDate, c.TargetAmount })
+                    .ToListAsync(ct);
+
+                // The API adds up the money so the browser never has to.
+                var collected = await db.Contributions.AsNoTracking()
+                    .Where(c => c.StokvelId == stokvelId)
+                    .GroupBy(c => c.ContributionCycleId)
+                    .Select(g => new { Id = g.Key, Total = g.Sum(c => c.Amount) })
+                    .ToDictionaryAsync(x => x.Id, x => x.Total, ct);
+
+                var items = cycles
+                    .OrderByDescending(c => c.Label, StringComparer.Ordinal)   // newest first ("2026-10" > "2026-09")
+                    .Select(c => new CycleSummaryResponse(
+                        c.Id,
+                        c.Label,
+                        c.Status == CycleStatus.PayoutProcessed ? "PaidOut"
+                            : c.ClosedAtUtc is null ? "Open" : "Closed",
+                        c.EndDate,
+                        ToCents(collected.GetValueOrDefault(c.Id)),
+                        ToCents(c.TargetAmount)))
+                    .ToList();
+
+                return Results.Ok(items);
+            })
+            .WithSummary("Every cycle of one stokvel, newest first")
+            .WithDescription("""
+                Status is Open, Closed (closed by the cycle-close job) or PaidOut. dueDate is the cycle's end date
+                as a calendar date (null for undated cycles). collectedCents is everything recorded against the
+                cycle; amountDueCents is the cycle's target amount. Money is integer cents.
+                """)
+            .Produces<List<CycleSummaryResponse>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .RequireAuthorization(Policies.StokvelMember);
 
