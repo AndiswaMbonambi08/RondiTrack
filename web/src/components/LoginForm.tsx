@@ -18,7 +18,7 @@ export function LoginForm() {
     try {
       await login(email, password)
       setPassword('')
-      await queryClient.invalidateQueries({ queryKey: queryKeys.me })
+      await queryClient.invalidateQueries({ queryKey: queryKeys.home })
     } catch (err) {
       setProblem(describeError(err, 'login'))
     } finally {
