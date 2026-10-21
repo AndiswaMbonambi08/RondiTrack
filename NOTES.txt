@@ -1,0 +1,147 @@
+Yesterdays Question(Purpose of Jobs/)?
+runs on its own, on a timer, without anyone clicking anything.
+basically like an alarm clock that does chores for you.
+CycleCloseJob is the “end of month” chore: Marks that cycle as closed.
+                                           Writes down who didn’t pay enough (that’s “arrears”).
+                                           Starts the next cycle.
+
+HousekeepingJob is the “clean up” chore. It deletes old tokens and old records that nobody needs anymore.
+
+web/
+
+vite.config.ts
+Added the Tailwind plugin and the @ alias. Later changed __dirname to import.meta.dirname.
+
+tsconfig.json
+Added baseUrl and paths for the @ alias, and fixed baseUrl sitting outside compilerOptions.
+
+tsconfig.app.json
+Added the same baseUrl and paths alias entries.
+
+package.json
+Added exact-pinned Tailwind, shadcn and Radix dependencies. Removed the stray cn package and checked there is no ^ or ~.
+
+components.json
+Created by shadcn init. It holds the style, aliases and CSS path for the components.
+
+.oxlintrc.json
+Added an override that turns off react/only-export-components only for src/components/ui/.
+
+index.html
+Added the inline script in <head> that sets light or dark before first paint, so there is no white flash.
+
+web/src/
+
+index.css
+Replaced with Tailwind, shadcn’s light and dark tokens, and the status colour tokens (info, success, warning, violet, danger).
+
+main.tsx
+Wrapped <App /> in <ThemeProvider>.
+
+App.tsx
+Removed the App.css import and switched to a mobile-first grid. Added the theme toggle, the stokvel cards and the contribution list.
+
+web/src/components/
+
+ui/badge.tsx, button.tsx, card.tsx, collapsible.tsx
+shadcn components. Moved out of the stray @ folder, and the cn import was repointed to @/lib/utils.
+
+StatusBadge.tsx
+StatusBadge takes a kind and a status, with a word, icon and tone for each. ArrearsBadge shows nothing when there are no arrears.
+
+DueCountdown.tsx
+Shows “Due today”, “Due tomorrow”, “Due in N days” or “Overdue by N days” for Open cycles only.
+
+ThemeProvider.tsx
+Holds the Light, Dark or System choice, saves it to storage inside try/catch, and follows the OS live in System mode.
+
+ThemeToggle.tsx
+Three buttons (Light, Dark, System) with icons and aria-pressed.
+
+ContributionCard.tsx (new)
+One contribution, showing the amount in cents, the date and a contribution StatusBadge.
+
+CycleGroupSection.tsx (new)
+One collapsible cycle group with a button header. It shows the status badge, due date, totals from the API and the countdown, plus “No contributions yet” for an empty group.
+
+ContributionList.tsx (new)
+Groups contributions by cycle and keeps open or closed state by cycle id. Expand all and Collapse all derive their label from that state.
+
+StokvelCard.tsx
+Title is now an <h3>. Added the arrears badge, cycle badge and countdown, and long names wrap. The role stays as plain text.
+
+web/src/hooks/
+
+useTheme.ts
+Returns the theme context.
+
+useSaMidnightClock.ts
+Uses one setTimeout to the next Johannesburg midnight, cleaned up with clearTimeout, with [now] as the dependency.
+
+web/src/lib/
+
+utils.ts
+The cn class-merging helper.
+
+theme-context.ts
+The Theme type, the storage key and the context.
+
+dueDate.ts
+Converts a date-only due date to a deadline at 22:00Z, describes the countdown in SA calendar days, and computes the milliseconds to the next SA midnight.
+
+dueDate.test.ts
+Covers the 23:30, 00:30 and 22:00:01Z boundaries and the 30-minute and 24-hour midnight cases.
+
+groupContributionsByCycle.ts
+A pure function that orders cycles newest first and keeps empty cycles. Orphan contributions go into an “Unknown cycle” group, and nothing is dropped.
+
+groupContributionsByCycle.test.ts
+Tests the ordering, empty cycles, unknown cycles and that the contribution count in equals the count out.
+
+money.arrears.test.ts
+Adds one arrears case for formatCents.
+
+web/src/api/ and web/src/data/
+
+api/types.ts
+Added the aliases for the cycle summary and contribution item types.
+
+api/schema.d.ts
+Regenerated so it includes the new cycles endpoint and the new fields.
+
+data/sample.ts
+Replaced the placeholders with captured data, including the long stokvel name and a double-barrelled member.
+
+Backend (repo root)
+
+Dtos/ContributionResponse.cs
+Added AmountCents and Status.
+
+Mapping/ContributionMapping.cs
+Fills the two new fields, converting the rand amount to whole cents.
+
+Dtos/CycleSummaryResponse.cs (new)
+Holds the cycle’s id, label, status, due date, total collected and amount due.
+
+Endpoints/PagedListEndpoints.cs
+Added GET /stokvels/{id}/cycles, newest first and members only.
+
+Dtos/HomeResponse.cs
+Added ArrearsCents to the stokvel entry.
+
+Services/HomeQueryService.cs
+Sums the caller’s own arrears per stokvel and fills the new field.
+
+Data/DatabaseInitializer.cs
+Seed now has three Umoja cycles (Open, Closed, PaidOut) and arrears for the Treasurer-and-Member user.
+
+RondiTrack.Tests/Integration/
+
+ContributionResponseShapeTests.cs (new)
+Checks AmountCents and Status on a recorded contribution.
+
+CycleListTests.cs (new)
+Checks newest-first order, the cents values, and that a non-member gets 404.
+
+HomeEndpointTests.cs
+Added a test that /me/home returns only the caller’s own arrears.
