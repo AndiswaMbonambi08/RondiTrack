@@ -24,7 +24,7 @@ export const useStokvels = () =>
 export const useStokvel = (id: string) =>
   useQuery({
     queryKey: queryKeys.stokvel(id),
-    queryFn: () => unwrap(api.GET('/api/v1/stokvels/{stokvelId}', { params: { path: { stokvelId: id } } })),
+    queryFn: () => unwrap(api.GET('/api/v1/stokvels/{id}', { params: { path: { id } } })),
   })
 
 export const useCycles = (id: string) =>
