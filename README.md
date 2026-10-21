@@ -1,4 +1,4 @@
-﻿# RondiTrack
+# RondiTrack
 RondiTrack is the foundation of a backend API for managing stokvels, rotating savings groups widely used in South Africa. Built with ASP.NET Core 10 Minimal APIs, it models the real-world rules of stokvels directly in code, ensuring invalid states are impossible rather than just checked later. The project focuses on domain modeling, HTTP contracts, and resource-oriented routing, laying the groundwork for a production-ready API.
 
 Minimal APIs were chosen over Controllers because they keep the project lightweight and focused. For an assignment centered on domain modeling and HTTP fundamentals, Minimal APIs reduce boilerplate, make routes explicit, and keep the logic close to the domain rules. This clarity helps demonstrate how the API enforces fairness and accountability in stokvels.
@@ -1437,20 +1437,235 @@ Why this matters for 7.2: the "In arrears" amount on a card comes from the cycle
 ## Single-flight proof
 Failing output with `return doRefresh()` instead of `refreshing ??= ...`:
 
-    TODO paste
+    
+     RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
+    
+     â¯ src/auth/session.test.ts (5 tests | 3 failed) 396ms
+       â¯ session (5)
+         Ã— five parallel 401s cause exactly one refresh 123ms
+         Ã— a later expiry starts a new refresh 59ms
+         Ã— a failed refresh signs out once and retries nothing 100ms
+         âœ“ no token means no loop 24ms
+         âœ“ a POST body survives the retry 86ms
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 3 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
+    
+     FAIL  src/auth/session.test.ts > session > five parallel 401s cause exactly one refresh
+    AssertionError: expected 5 to be 1 // Object.is equality
+    
+    - Expected
+    + Received
+    
+    - 1
+    + 5
+    
+     â¯ src/auth/session.test.ts:41:30
+         39|     await login('a@b.co', 'pw')
+         40|     const responses = await fetchFive()
+         41|     expect(api.refreshCalls).toBe(1)
+           |                              ^
+         42|     expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200â€¦
+         43|   })
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[1/3]âŽ¯
+    
+     FAIL  src/auth/session.test.ts > session > a later expiry starts a new refresh
+    AssertionError: expected 7 to be 2 // Object.is equality
+    
+    - Expected
+    + Received
+    
+    - 2
+    + 7
+    
+     â¯ src/auth/session.test.ts:51:30
+         49|     api.valid = 'newer' // the token held now has expired
+         50|     const later = await Promise.all([authFetch(new Request(url)), authâ€¦
+         51|     expect(api.refreshCalls).toBe(2)
+           |                              ^
+         52|     expect(later.map((r) => r.status)).toEqual([200, 200])
+         53|   })
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[2/3]âŽ¯
+    
+     FAIL  src/auth/session.test.ts > session > a failed refresh signs out once and retries nothing
+    AssertionError: expected "vi.fn()" to be called 1 times, but got 3 times
+     â¯ src/auth/session.test.ts:61:23
+         59|     onSignedOut(signedOut)
+         60|     const responses = await Promise.all([1, 2, 3].map(() => authFetch(â€¦
+         61|     expect(signedOut).toHaveBeenCalledTimes(1)
+           |                       ^
+         62|     expect(api.refreshCalls).toBe(1)
+         63|     expect(api.protectedCalls).toBe(3) // each request sent once, noneâ€¦
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[3/3]âŽ¯
+    
+    
+     Test Files  1 failed (1)
+          Tests  3 failed | 2 passed (5)
+       Start at  01:07:45
+       Duration  22.14s (environment 77%, setup 10%, transform 10%, tests 2%)
+    
 
 Passing output with the line restored:
 
-    TODO paste
+    
+     RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
+    
+     âœ“ src/auth/session.test.ts (5 tests) 319ms
+    
+     Test Files  1 passed (1)
+          Tests  5 passed (5)
+       Start at  01:08:21
+       Duration  9.03s (environment 81%, setup 13%, tests 4%, transform 1%, worker 1%)
+    
 
 ## Stokvel switch proof
 Failing output with `placeholderData: keepPreviousData` added to `useContributions`:
 
-    TODO paste
+    
+     RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
+    
+     â¯ src/features/StokvelWorkspace.test.tsx (1 test | 1 failed) 1230ms
+       â¯ switching stokvels (1)
+         Ã— never shows the previous stokvel contributions after a switch 1184ms
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 1 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
+    
+     FAIL  src/features/StokvelWorkspace.test.tsx > switching stokvels > never shows the previous stokvel contributions after a switch
+    TestingLibraryElementError: Unable to find an element with the text: R 1 111,00 (normalized from 'RÂ 1Â 111,00'). This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+    
+    Ignored nodes: comments, script, style
+    <body>
+      <div>
+        <div
+          class="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+        >
+          <header
+            class="bg-slate-800 text-white"
+          >
+            <div
+              class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3"
+            >
+              <h1
+                class="text-lg font-bold"
+              >
+                RondiTrack
+              </h1>
+              <div
+                class="flex items-center gap-3"
+              >
+                <div
+                  class="flex items-center gap-2 text-sm"
+                >
+                  <label
+                    for="stokvel-switch"
+                  >
+                    Stokvel
+                  </label>
+                  <select
+                    class="rounded bg-slate-700 px-2 py-1.5 text-white"
+                    id="stokvel-switch"
+                  >
+                    <option
+                      value="mabena"
+                    >
+                      Mabena Family
+                    </option>
+                    <option
+                      value="soweto"
+                    >
+                      Soweto Teachers
+                    </option>
+                  </select>
+                </div>
+                <button
+                  class="rounded bg-slate-600 px-3 py-1.5 text-sm hover:bg-slate-500"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </header>
+          <main
+            class="mx-auto max-w-5xl p-6"
+          >
+            <section>
+              <div
+                class="rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900 flex items-center justify-between gap-4"
 
 Passing output without it:
 
-    TODO paste
+    
+     RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
+    
+     â¯ src/features/StokvelWorkspace.test.tsx (1 test | 1 failed) 1320ms
+       â¯ switching stokvels (1)
+         Ã— never shows the previous stokvel contributions after a switch 1306ms
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 1 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
+    
+     FAIL  src/features/StokvelWorkspace.test.tsx > switching stokvels > never shows the previous stokvel contributions after a switch
+    TestingLibraryElementError: Unable to find an element with the text: R 1 111,00 (normalized from 'RÂ 1Â 111,00'). This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+    
+    Ignored nodes: comments, script, style
+    <body>
+      <div>
+        <div
+          class="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+        >
+          <header
+            class="bg-slate-800 text-white"
+          >
+            <div
+              class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3"
+            >
+              <h1
+                class="text-lg font-bold"
+              >
+                RondiTrack
+              </h1>
+              <div
+                class="flex items-center gap-3"
+              >
+                <div
+                  class="flex items-center gap-2 text-sm"
+                >
+                  <label
+                    for="stokvel-switch"
+                  >
+                    Stokvel
+                  </label>
+                  <select
+                    class="rounded bg-slate-700 px-2 py-1.5 text-white"
+                    id="stokvel-switch"
+                  >
+                    <option
+                      value="mabena"
+                    >
+                      Mabena Family
+                    </option>
+                    <option
+                      value="soweto"
+                    >
+                      Soweto Teachers
+                    </option>
+                  </select>
+                </div>
+                <button
+                  class="rounded bg-slate-600 px-3 py-1.5 text-sm hover:bg-slate-500"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </header>
+          <main
+            class="mx-auto max-w-5xl p-6"
+          >
+            <section>
+              <div
+                class="rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900 flex items-center justify-between gap-4"
 
 Money: the API sends `amountInCents` (integers), because `0.1 + 0.2` is `0.30000000000000004` in JSON numbers, so rands as decimals would drift.
 
