@@ -6,6 +6,7 @@ import { formatCents, formatDay } from '../lib/money'
 
 const card = 'rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900'
 const muted = 'text-slate-500 dark:text-slate-400'
+const pulse = 'animate-pulse rounded bg-slate-200 dark:bg-slate-800'
 
 function statusTone(status: string) {
   const s = status.toLowerCase()
@@ -31,20 +32,16 @@ function Header({ children }: { children?: ReactNode }) {
   )
 }
 
-function SkeletonGrid() {
-  const bar = 'animate-pulse rounded bg-slate-200 dark:bg-slate-800'
+function RowsSkeleton() {
   return (
-    <div data-testid="stokvel-skeleton" aria-busy="true">
-      <div className={`${card} h-20 animate-pulse`} />
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className={`${card} space-y-3`}>
-            <div className={`${bar} h-4 w-2/3`} />
-            <div className={`${bar} h-4 w-1/3`} />
-          </div>
-        ))}
-      </div>
-    </div>
+    <ul data-testid="stokvel-skeleton" aria-busy="true" className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <li key={i} className={`${card} space-y-3`}>
+          <div className={`${pulse} h-4 w-2/3`} />
+          <div className={`${pulse} h-4 w-1/3`} />
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -63,10 +60,9 @@ function StokvelPanel({ stokvelId, onBack }: { stokvelId: string; onBack: () => 
       />
     )
   }
-  // Name, total and rows render together or not at all, so they can never be from different stokvels.
-  if (stokvel.isPending || contributions.isPending) return <SkeletonGrid />
 
-  const rows = contributions.data.pages.flatMap((p) => p.items ?? [])
+  // Each part shows its own data or its own skeleton. Nothing is carried over from another stokvel.
+  const rows = contributions.data?.pages.flatMap((p) => p.items ?? []) ?? []
   const statuses = ['All', ...new Set(rows.map((r) => String(r.status)))]
   const active = statuses.includes(filter) ? filter : 'All'
   const shown = active === 'All' ? rows : rows.filter((r) => String(r.status) === active)
@@ -76,18 +72,24 @@ function StokvelPanel({ stokvelId, onBack }: { stokvelId: string; onBack: () => 
     <section>
       <div className={`${card} flex items-center justify-between gap-4`}>
         <div>
-          <h2 className="text-xl font-semibold">{stokvel.data.name}</h2>
-          <p className={`text-sm ${muted}`}>
-            {shown.length} {shown.length === 1 ? 'contribution' : 'contributions'}
-          </p>
+          {stokvel.data
+            ? <h2 className="text-xl font-semibold">{stokvel.data.name}</h2>
+            : <div className={`${pulse} h-6 w-48`} />}
+          {contributions.data
+            ? <p className={`text-sm ${muted}`}>{shown.length} {shown.length === 1 ? 'contribution' : 'contributions'}</p>
+            : <div className={`${pulse} mt-2 h-4 w-24`} />}
         </div>
         <div className="text-right">
           <p className={`text-xs ${muted}`}>Total shown</p>
-          <p className="text-xl font-bold tabular-nums">{formatCents(total)}</p>
+          {contributions.data
+            ? <p className="text-xl font-bold tabular-nums">{formatCents(total)}</p>
+            : <div className={`${pulse} ml-auto mt-1 h-6 w-24`} />}
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {!contributions.data ? (
+        <RowsSkeleton />
+      ) : rows.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-slate-300 p-6 dark:border-slate-700">
           <p className="font-medium">No contributions yet.</p>
           <p className={muted}>Once the treasurer records the first contribution for this cycle, it will show up here.</p>
@@ -164,7 +166,7 @@ export function StokvelWorkspace() {
   )
 
   let body: ReactNode
-  if (stokvels.isPending) body = <SkeletonGrid />
+  if (stokvels.isPending) body = <RowsSkeleton />
   else if (stokvels.isError) body = <ErrorView error={stokvels.error} onRetry={() => stokvels.refetch()} />
   else if (!activeId) {
     body = (
