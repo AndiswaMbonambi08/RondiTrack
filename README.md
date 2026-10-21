@@ -1424,3 +1424,41 @@ Some work in the app has to happen by itself, at a certain time, with nobody cli
 - **The housekeeping job** is the tidy-up chore. It deletes old leftovers, such as expired idempotency records and tokens, so the database does not fill with junk.
 
 Why this matters for 7.2: the "In arrears" amount on a card comes from the cycle-close job. The website only shows that number; it never works out who owes what, because the server's job and clock decide that.
+
+## API contract notes
+| # | Check | What I found | Fix made |
+|---|-------|--------------|----------|
+| 1 | CORS: origin `http://localhost:3000`, credentials, exposes `Retry-After` | TODO paste the two response headers | TODO |
+| 2 | Refresh cookie: HttpOnly, rotating, path covers `/api/v1/auth` | TODO paste the Set-Cookie header | TODO |
+| 3 | `/me` and `/me/home` | TODO paste both bodies, trimmed | TODO |
+| 4 | "No next page" on contributions | TODO `nextPageToken` is `""` or `null`? The hook treats both as the end | TODO |
+| 5 | Two refreshes with the same cookie | TODO status codes you saw | Single-flight in `session.ts` |
+
+## Single-flight proof
+Failing output with `return doRefresh()` instead of `refreshing ??= ...`:
+
+    TODO paste
+
+Passing output with the line restored:
+
+    TODO paste
+
+## Stokvel switch proof
+Failing output with `placeholderData: keepPreviousData` added to `useContributions`:
+
+    TODO paste
+
+Passing output without it:
+
+    TODO paste
+
+Money: the API sends `amountInCents` (integers), because `0.1 + 0.2` is `0.30000000000000004` in JSON numbers, so rands as decimals would drift.
+
+## Shared phone check
+1. Signed in as member A, opened a stokvel B doesn't belong to. TODO what I saw
+2. Signed out, signed in as member B without reloading. TODO
+3. TanStack Query Devtools: no query for A's stokvel. TODO screenshot
+4. No URL state yet (routing arrives in Week 8).
+
+## Known gaps
+TODO
