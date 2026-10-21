@@ -55,9 +55,11 @@ export const cycles: CycleSummary[] = [
 ];
 
 export const contributions: ContributionItem[] = [
-  { id: 'aaaaaaaa-0000-0000-0000-000000000001', contributionCycleId: '22222222-2222-2222-2222-222222222222', amountCents: 10, recordedAt: '2026-10-31T22:30:00Z', status: 'Paid' },
-  { id: 'aaaaaaaa-0000-0000-0000-000000000002', contributionCycleId: '22222222-2222-2222-2222-222222222223', amountCents: 1234567, recordedAt: '2026-09-29T14:05:00Z', status: 'Pending' },
-  { id: 'aaaaaaaa-0000-0000-0000-000000000003', contributionCycleId: '22222222-2222-2222-2222-222222222224', amountCents: 50000, recordedAt: '2026-08-28T09:15:00Z', status: 'Confirmed' },
-  { id: 'aaaaaaaa-0000-0000-0000-000000000004', contributionCycleId: '22222222-2222-2222-2222-222222222224', amountCents: 25000, recordedAt: '2026-08-20T08:00:00Z', status: 'Frozen' }, // unknown status
-  { id: 'aaaaaaaa-0000-0000-0000-000000000005', contributionCycleId: '99999999-9999-9999-9999-999999999999', amountCents: 30000, recordedAt: '2026-06-01T10:00:00Z', status: 'Confirmed' }, // cycle not in the list
+  { id: 'aaaaaaaa-0000-0000-0000-000000000001', cycleId: '22222222-2222-2222-2222-222222222222', cycleLabel: '2026-10', amountCents: 10, recordedAt: '2026-10-31T22:30:00Z', status: 'Paid' },
+  { id: 'aaaaaaaa-0000-0000-0000-000000000002', cycleId: '22222222-2222-2222-2222-222222222223', cycleLabel: '2026-09', amountCents: 1234567, recordedAt: '2026-09-29T14:05:00Z', status: 'Pending' },
+  { id: 'aaaaaaaa-0000-0000-0000-000000000003', cycleId: '22222222-2222-2222-2222-222222222224', cycleLabel: '2026-08', amountCents: 50000, recordedAt: '2026-08-28T09:15:00Z', status: 'Confirmed' },
+  // Unknown status: the API type only lists three values, so cast on purpose to prove StatusBadge shows the raw value.
+  { id: 'aaaaaaaa-0000-0000-0000-000000000004', cycleId: '22222222-2222-2222-2222-222222222224', cycleLabel: '2026-08', amountCents: 25000, recordedAt: '2026-08-20T08:00:00Z', status: 'Frozen' as unknown as ContributionItem['status'] },
+  // Cycle not in the cycles list: must land in "Unknown cycle".
+  { id: 'aaaaaaaa-0000-0000-0000-000000000005', cycleId: '99999999-9999-9999-9999-999999999999', cycleLabel: '2026-06', amountCents: 30000, recordedAt: '2026-06-01T10:00:00Z', status: 'Confirmed' },
 ];
