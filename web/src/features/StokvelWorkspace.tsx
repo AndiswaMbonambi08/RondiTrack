@@ -2,6 +2,8 @@ import { useState, type ReactNode } from 'react'
 import { useContributions, useStokvel, useStokvels } from '../api/queries'
 import { logout } from '../auth/session'
 import { ErrorView } from '../components/ErrorView'
+import { Wordmark } from '../components/Wordmark'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { formatCents, formatDay } from '../lib/money'
 
 const card = 'rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900'
@@ -18,12 +20,13 @@ function statusTone(status: string) {
 
 function Header({ children }: { children?: ReactNode }) {
   return (
-    <header className="bg-slate-800 text-white">
+    <header className="bg-emerald-200 text-emerald-950 dark:bg-emerald-900 dark:text-emerald-50">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3">
-        <h1 className="text-lg font-bold">RondiTrack</h1>
+        <h1><Wordmark className="text-xl" /></h1>
         <div className="flex items-center gap-3">
           {children}
-          <button className="rounded bg-slate-600 px-3 py-1.5 text-sm hover:bg-slate-500" onClick={() => void logout()}>
+          <ThemeToggle />
+          <button className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700" onClick={() => void logout()}>
             Sign out
           </button>
         </div>
@@ -151,17 +154,23 @@ export function StokvelWorkspace() {
   const list = stokvels.data
   const activeId = list && list.length > 0 ? (selectedId ?? list[0].id) : undefined
 
-  const switcher = list && list.length > 0 && (
-    <div className="flex items-center gap-2 text-sm">
-      <label htmlFor="stokvel-switch">Stokvel</label>
-      <select
-        id="stokvel-switch"
-        className="rounded bg-slate-700 px-2 py-1.5 text-white"
-        value={activeId}
-        onChange={(e) => setSelectedId(e.target.value)}
-      >
-        {list.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
+  const switcher = list && list.length > 1 && (
+    <div role="group" aria-label="Stokvel" className="mb-4 flex flex-wrap gap-2">
+      {list.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          aria-pressed={s.id === activeId}
+          onClick={() => setSelectedId(s.id)}
+          className={`rounded-full px-4 py-1.5 text-sm font-medium ${
+            s.id === activeId
+              ? 'bg-emerald-600 text-white'
+              : 'bg-white text-slate-800 hover:bg-emerald-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+          }`}
+        >
+          {s.name}
+        </button>
+      ))}
     </div>
   )
 
@@ -182,8 +191,8 @@ export function StokvelWorkspace() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <Header>{switcher}</Header>
-      <main className="mx-auto max-w-5xl p-6">{body}</main>
+      <Header />
+      <main className="mx-auto max-w-5xl p-6">{switcher}{body}</main>
     </div>
   )
 }

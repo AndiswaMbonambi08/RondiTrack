@@ -51,7 +51,7 @@ describe('switching stokvels', () => {
     expect((await screen.findAllByText(money(MABENA.cents))).length).toBeGreaterThan(0)
     expect(screen.getByText('Mabena Family', { selector: 'h2' })).toBeInTheDocument()
 
-    await userEvent.selectOptions(screen.getByLabelText('Stokvel'), 'soweto')
+    await userEvent.click(screen.getByRole('button', { name: 'Soweto Teachers' }))
 
     // immediately after the switch: no Mabena amount, the skeleton instead
     expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
