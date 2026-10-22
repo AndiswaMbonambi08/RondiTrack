@@ -1593,4 +1593,4 @@ Sign-out, by the button or a failed refresh, calls `queryClient.clear()` and rem
 - None of the stretch challenges are done. Two tabs can still race on one refresh cookie, and the loser revokes the whole token family and signs the member out everywhere. Fixing that needs a BroadcastChannel or Web Locks approach.
 - The member's stokvel list comes from `/me/home` because `GET /stokvels` is platform-admin only.
 - `npm audit` reports 7 high severity advisories that I have not triaged.
-- One backend test, `MoneyRateLimitTests`, failed once during the full 104-test run on a slow machine and passes when run on its own. It depends on a token refilling every 10 seconds, so I treat it as timing under load.
+- One backend test, `MoneyRateLimitTests`, failed once during the full 104-test run on a slow machine. I have not yet rerun it on its own, so I do not know whether it is a timing problem or a real failure. It depends on a token refilling every 10 seconds.
