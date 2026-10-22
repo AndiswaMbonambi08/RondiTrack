@@ -1576,10 +1576,21 @@ Passing output without it:
 Money: the API sends `amountInCents` (integers), because `0.1 + 0.2` is `0.30000000000000004` in JSON numbers, so rands as decimals would drift.
 
 ## Shared phone check
-1. Signed in as member A, opened a stokvel B doesn't belong to. TODO what I saw
-2. Signed out, signed in as member B without reloading. TODO
-3. TanStack Query Devtools: no query for A's stokvel. TODO screenshot
-4. No URL state yet (routing arrives in Week 8).
+1. Signed in as member A (demo.a) and opened Mabena Family, a stokvel member B does not belong to.
+2. Signed out with the button, then signed in as member B (demo.b) without reloading the page. B saw only B's stokvels.
+3. In the TanStack Query Devtools no query for Mabena Family existed after sign-out. Screenshot:
+
+   ![Devtools after sign-out, no query for A's stokvel](docs/screenshots/devtools-no-stokvel-a.png)
+
+4. No URL state yet (routing arrives in Week 8). I did not repeat the "removed from a stokvel while it was open" check by hand for this write-up.
+
+Sign-out, by the button or a failed refresh, calls `queryClient.clear()` and remounts the tree, so the selected stokvel id goes too. Local Storage holds only `theme`, which the assignment allows. No token and no stokvel id is stored anywhere.
 
 ## Known gaps
-TODO
+- No screen recording is attached to this PR. I ran out of time and could not record it.
+- No routing or URL state yet, so "open another stokvel's id in the URL" is not shown.
+- `useCycles` and `useMe` exist and are typed but no screen renders cycles yet. The sign-in gate uses `/me/home`.
+- None of the stretch challenges are done. Two tabs can still race on one refresh cookie, and the loser revokes the whole token family and signs the member out everywhere. Fixing that needs a BroadcastChannel or Web Locks approach.
+- The member's stokvel list comes from `/me/home` because `GET /stokvels` is platform-admin only.
+- `npm audit` reports 7 high severity advisories that I have not triaged.
+- One backend test, `MoneyRateLimitTests`, failed once during the full 104-test run on a slow machine and passes when run on its own. It depends on a token refilling every 10 seconds, so I treat it as timing under load.
