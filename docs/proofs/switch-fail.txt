@@ -1,9 +1,9 @@
 
 [1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90mC:/Users/Andiswa Mbonambi/RondiTrack/web[39m
 
- [31m❯[39m src/features/StokvelWorkspace.test.tsx [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 977[2mms[22m[39m
+ [31m❯[39m src/features/StokvelWorkspace.test.tsx [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 1033[2mms[22m[39m
    [31m❯[39m switching stokvels [2m(1)[22m
-[31m     [31m×[31m never shows the previous stokvel contributions after a switch[39m[33m 972[2mms[22m[39m
+[31m     [31m×[31m never shows the previous stokvel contributions after a switch[39m[33m 1029[2mms[22m[39m
 
 [31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
 
@@ -16,19 +16,19 @@
 [32m- 0[39m
 [31m+ 2[39m
 
-[36m [2m❯[22m src/features/StokvelWorkspace.test.tsx:[2m51:56[22m[39m
-    [90m 49|[39m
-    [90m 50|[39m     // immediately after the switch: no Mabena name, no Mabena amount,…
-    [90m 51|[39m     expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
+[36m [2m❯[22m src/features/StokvelWorkspace.test.tsx:[2m57:56[22m[39m
+    [90m 55|[39m
+    [90m 56|[39m     // immediately after the switch: no Mabena amount, the skeleton in…
+    [90m 57|[39m     expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
     [90m   |[39m                                                        [31m^[39m
-    [90m 52|[39m     expect(screen.queryByText('Mabena Family', { selector: 'h2' })).no…
-    [90m 53|[39m     expect(screen.getByTestId('stokvel-skeleton')).toBeInTheDocument()
+    [90m 58|[39m     expect(screen.queryByText('Mabena Family', { selector: 'h2' })).no…
+    [90m 59|[39m     expect(screen.getByTestId('stokvel-skeleton')).toBeInTheDocument()
 
 [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
 
 
 [2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
 [2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
-[2m   Start at [22m 01:20:01
-[2m   Duration [22m 9.16s[2m (environment 58%, setup 15%, tests 12%, import 10%, worker 3%, transform 3%)[22m
+[2m   Start at [22m 03:06:06
+[2m   Duration [22m 11.79s[2m (environment 42%, import 20%, transform 18%, setup 11%, tests 9%)[22m
 

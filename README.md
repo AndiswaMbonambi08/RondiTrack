@@ -1440,13 +1440,13 @@ Failing output with `return doRefresh()` instead of `refreshing ??= ...`:
     
      RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
     
-     â¯ src/auth/session.test.ts (5 tests | 3 failed) 334ms
+     â¯ src/auth/session.test.ts (5 tests | 3 failed) 290ms
        â¯ session (5)
-         Ã— five parallel 401s cause exactly one refresh 90ms
-         Ã— a later expiry starts a new refresh 58ms
-         Ã— a failed refresh signs out once and retries nothing 25ms
-         âœ“ no token means no loop 22ms
-         âœ“ a POST body survives the retry 130ms
+         Ã— five parallel 401s cause exactly one refresh 147ms
+         Ã— a later expiry starts a new refresh 52ms
+         Ã— a failed refresh signs out once and retries nothing 26ms
+         âœ“ no token means no loop 24ms
+         âœ“ a POST body survives the retry 36ms
     
     âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 3 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
     
@@ -1503,8 +1503,8 @@ Failing output with `return doRefresh()` instead of `refreshing ??= ...`:
     
      Test Files  1 failed (1)
           Tests  3 failed | 2 passed (5)
-       Start at  01:19:21
-       Duration  9.93s (environment 80%, setup 11%, tests 4%, worker 4%, transform 1%)
+       Start at  03:05:35
+       Duration  10.43s (environment 90%, setup 6%, tests 3%, transform 1%)
     
 
 Passing output with the line restored:
@@ -1512,12 +1512,12 @@ Passing output with the line restored:
     
      RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
     
-     âœ“ src/auth/session.test.ts (5 tests) 193ms
+     âœ“ src/auth/session.test.ts (5 tests) 223ms
     
      Test Files  1 passed (1)
           Tests  5 passed (5)
-       Start at  01:19:41
-       Duration  5.75s (environment 85%, setup 9%, tests 4%, worker 1%, transform 1%)
+       Start at  03:05:53
+       Duration  5.02s (environment 70%, setup 22%, tests 5%, transform 2%, import 1%, worker 1%)
     
 
 ## Stokvel switch proof
@@ -1526,9 +1526,9 @@ Failing output with `placeholderData: keepPreviousData` added to `useContributio
     
      RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
     
-     â¯ src/features/StokvelWorkspace.test.tsx (1 test | 1 failed) 977ms
+     â¯ src/features/StokvelWorkspace.test.tsx (1 test | 1 failed) 1033ms
        â¯ switching stokvels (1)
-         Ã— never shows the previous stokvel contributions after a switch 972ms
+         Ã— never shows the previous stokvel contributions after a switch 1029ms
     
     âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 1 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
     
@@ -1541,21 +1541,21 @@ Failing output with `placeholderData: keepPreviousData` added to `useContributio
     - 0
     + 2
     
-     â¯ src/features/StokvelWorkspace.test.tsx:51:56
-         49|
-         50|     // immediately after the switch: no Mabena name, no Mabena amount,â€¦
-         51|     expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
+     â¯ src/features/StokvelWorkspace.test.tsx:57:56
+         55|
+         56|     // immediately after the switch: no Mabena amount, the skeleton inâ€¦
+         57|     expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
            |                                                        ^
-         52|     expect(screen.queryByText('Mabena Family', { selector: 'h2' })).noâ€¦
-         53|     expect(screen.getByTestId('stokvel-skeleton')).toBeInTheDocument()
+         58|     expect(screen.queryByText('Mabena Family', { selector: 'h2' })).noâ€¦
+         59|     expect(screen.getByTestId('stokvel-skeleton')).toBeInTheDocument()
     
     âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[1/1]âŽ¯
     
     
      Test Files  1 failed (1)
           Tests  1 failed (1)
-       Start at  01:20:01
-       Duration  9.16s (environment 58%, setup 15%, tests 12%, import 10%, worker 3%, transform 3%)
+       Start at  03:06:06
+       Duration  11.79s (environment 42%, import 20%, transform 18%, setup 11%, tests 9%)
     
 
 Passing output without it:
@@ -1563,14 +1563,14 @@ Passing output without it:
     
      RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
     
-     âœ“ src/features/StokvelWorkspace.test.tsx (1 test) 1062ms
+     âœ“ src/features/StokvelWorkspace.test.tsx (1 test) 1003ms
        âœ“ switching stokvels (1)
-         âœ“ never shows the previous stokvel contributions after a switch 1059ms
+         âœ“ never shows the previous stokvel contributions after a switch 1000ms
     
      Test Files  1 passed (1)
           Tests  1 passed (1)
-       Start at  01:20:18
-       Duration  7.11s (environment 59%, tests 16%, import 13%, setup 9%, transform 3%, worker 1%)
+       Start at  03:06:25
+       Duration  7.00s (environment 50%, import 23%, tests 16%, setup 6%, transform 4%)
     
 
 Money: the API sends `amountInCents` (integers), because `0.1 + 0.2` is `0.30000000000000004` in JSON numbers, so rands as decimals would drift.

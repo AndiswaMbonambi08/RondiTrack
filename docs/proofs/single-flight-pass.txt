@@ -1,10 +1,10 @@
 
 [1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90mC:/Users/Andiswa Mbonambi/RondiTrack/web[39m
 
- [32m✓[39m src/auth/session.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 193[2mms[22m[39m
+ [32m✓[39m src/auth/session.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 223[2mms[22m[39m
 
 [2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
 [2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
-[2m   Start at [22m 01:19:41
-[2m   Duration [22m 5.75s[2m (environment 85%, setup 9%, tests 4%, worker 1%, transform 1%)[22m
+[2m   Start at [22m 03:05:53
+[2m   Duration [22m 5.02s[2m (environment 70%, setup 22%, tests 5%, transform 2%, import 1%, worker 1%)[22m
 
