@@ -1,5 +1,8 @@
 using RondiTrack.Authorization;
+using RondiTrack.Data;
+using RondiTrack.Domain;
 using RondiTrack.Dtos;
+using RondiTrack.Mapping;
 using RondiTrack.Services;
 
 namespace RondiTrack.Endpoints;
@@ -10,6 +13,22 @@ public static class MeEndpoints
     {
         var group = app.MapGroup(ApiRoutes.Me).WithTags("Me");
 
+        group.MapGet("", async (HttpContext http, IUserCredentialStore credentials) =>
+        {
+            var userId = http.User.GetUserId();
+            if (userId is null)
+                return AuthProblems.Unauthorized(http);
+
+            var user = await credentials.FindByIdAsync(userId.Value);
+            if (user is null || !user.IsActive)
+                return AuthProblems.Unauthorized(http);
+
+            return Results.Ok(user.ToResponse());
+        })
+        .WithSummary("Who the signed-in member is")
+        .WithDescription("Returns the caller's own profile and never a password hash. Their role in each stokvel comes from /me/home.")
+        .Produces<UserResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized);
         group.MapGet("/home", async (HttpContext http, HomeQueryService home, CancellationToken ct) =>
         {
             var userId = http.User.GetUserId();

@@ -18,13 +18,26 @@ export const useMe = () =>
 export const useHome = () =>
   useQuery({ queryKey: queryKeys.home, queryFn: () => unwrap(api.GET('/api/v1/me/home')) })
 
+// GET /stokvels lists every stokvel and is for platform admins only. A member's own stokvels,
+// with their role in each, come from /me/home. One request and one cache entry serve all three hooks.
+const homeQuery = {
+  queryKey: queryKeys.home,
+  queryFn: () => unwrap(api.GET('/api/v1/me/home')),
+}
+
 export const useStokvels = () =>
-  useQuery({ queryKey: queryKeys.stokvels, queryFn: () => unwrap(api.GET('/api/v1/stokvels')) })
+  useQuery({
+    ...homeQuery,
+    select: (home) => home.stokvels.map((s) => ({ id: s.stokvelId, name: s.name, role: s.role })),
+  })
 
 export const useStokvel = (id: string) =>
   useQuery({
-    queryKey: queryKeys.stokvel(id),
-    queryFn: () => unwrap(api.GET('/api/v1/stokvels/{id}', { params: { path: { id } } })),
+    ...homeQuery,
+    select: (home) => {
+      const s = home.stokvels.find((x) => x.stokvelId === id)
+      return s ? { id: s.stokvelId, name: s.name, role: s.role } : undefined
+    },
   })
 
 export const useCycles = (id: string) =>
@@ -43,9 +56,9 @@ export const useContributions = (id: string) =>
     queryFn: ({ pageParam }) =>
       unwrap(
         api.GET('/api/v1/stokvels/{stokvelId}/contributions', {
-          params: { path: { stokvelId: id }, query: { pageToken: pageParam } },
+          params: { path: { stokvelId: id }, query: { PageToken: pageParam } },
         }),
       ),
-    // check 4: "no next page" may be "" or null; both mean stop
+    // check 4: the API sends "" for no next page; null or undefined would also mean stop
     getNextPageParam: (last) => last.nextPageToken || undefined,
   })

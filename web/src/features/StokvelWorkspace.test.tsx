@@ -15,19 +15,25 @@ const money = (cents: number) => formatCents(cents).replace(/\s/g, ' ')
 const MABENA = { id: 'mabena', name: 'Mabena Family', cents: 111100 }
 const SOWETO = { id: 'soweto', name: 'Soweto Teachers', cents: 777700 }
 
+const homeEntry = (s: { id: string; name: string }) => ({
+  stokvelId: s.id, name: s.name, role: 'Member', currentCycle: null,
+  paidCents: 0, owedCents: 0, arrearsCents: 0, nextPayoutUtc: null,
+})
+
 function installFakeApi() {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const req = input instanceof Request ? input : new Request(input, init)
     const { pathname } = new URL(req.url)
     if (pathname.endsWith('/auth/login')) return json({ accessToken: 't' })
-    if (pathname.endsWith('/api/v1/stokvels')) return json([MABENA, SOWETO].map(({ id, name }) => ({ id, name })))
-    const m = pathname.match(/\/stokvels\/([^/]+)(\/contributions)?$/)
+    if (pathname.endsWith('/api/v1/me/home')) {
+      return json({ asOfUtc: '2026-10-21T08:00:00Z', stokvels: [MABENA, SOWETO].map(homeEntry) })
+    }
+    const m = pathname.match(/\/stokvels\/([^/]+)\/contributions$/)
     if (!m) return new Response(null, { status: 404 })
     const s = m[1] === 'mabena' ? MABENA : SOWETO
     if (s === SOWETO) await sleep(300) // the second stokvel answers slowly, or the bug cannot appear
-    if (!m[2]) return json({ id: s.id, name: s.name })
     return json({
-      items: [{ id: `${s.id}-1`, memberName: 'Member', amountInCents: s.cents, status: 'Paid', recordedAt: '2026-10-01T08:00:00Z', cycleId: 'c1' }],
+      items: [{ id: `${s.id}-1`, amountCents: s.cents, status: 'Paid', recordedAt: '2026-10-01T08:00:00Z', cycleId: 'c1', cycleLabel: '2026-10' }],
       nextPageToken: '',
     })
   }))
@@ -47,7 +53,7 @@ describe('switching stokvels', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Stokvel'), 'soweto')
 
-    // immediately after the switch: no Mabena name, no Mabena amount, the skeleton instead
+    // immediately after the switch: no Mabena amount, the skeleton instead
     expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
     expect(screen.queryByText('Mabena Family', { selector: 'h2' })).not.toBeInTheDocument()
     expect(screen.getByTestId('stokvel-skeleton')).toBeInTheDocument()

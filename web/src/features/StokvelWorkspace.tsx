@@ -10,7 +10,7 @@ const pulse = 'animate-pulse rounded bg-slate-200 dark:bg-slate-800'
 
 function statusTone(status: string) {
   const s = status.toLowerCase()
-  if (s.includes('paid') || s.includes('complete')) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100'
+  if (s.includes('paid') || s.includes('confirm') || s.includes('complete')) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100'
   if (s.includes('pend') || s.includes('due')) return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100'
   if (s.includes('late') || s.includes('miss') || s.includes('overdue')) return 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-100'
   return 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
@@ -66,7 +66,7 @@ function StokvelPanel({ stokvelId, onBack }: { stokvelId: string; onBack: () => 
   const statuses = ['All', ...new Set(rows.map((r) => String(r.status)))]
   const active = statuses.includes(filter) ? filter : 'All'
   const shown = active === 'All' ? rows : rows.filter((r) => String(r.status) === active)
-  const total = shown.reduce((sum, r) => sum + r.amountInCents, 0)
+  const total = shown.reduce((sum, r) => sum + r.amountCents, 0)
 
   return (
     <section>
@@ -116,9 +116,9 @@ function StokvelPanel({ stokvelId, onBack }: { stokvelId: string; onBack: () => 
             {shown.map((r) => (
               <li key={r.id} className={card}>
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold">{r.memberName}</p>
+                  <p className="font-semibold">{r.cycleLabel}</p>
                   <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-bold tabular-nums text-white">
-                    {formatCents(r.amountInCents)}
+                    {formatCents(r.amountCents)}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs">
