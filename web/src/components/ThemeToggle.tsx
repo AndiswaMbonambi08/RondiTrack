@@ -1,32 +1,33 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { useSyncExternalStore } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/useTheme';
-import type { Theme } from '@/lib/theme-context';
 
-const OPTIONS = [
-  { value: 'light', label: 'Light', Icon: Sun },
-  { value: 'dark', label: 'Dark', Icon: Moon },
-  { value: 'system', label: 'System', Icon: Monitor },
-] as const satisfies readonly { value: Theme; label: string; Icon: typeof Sun }[];
+const query = '(prefers-color-scheme: dark)';
+const subscribe = (cb: () => void) => {
+  const mql = window.matchMedia(query);
+  mql.addEventListener('change', cb);
+  return () => mql.removeEventListener('change', cb);
+};
+const systemPrefersDark = () => window.matchMedia(query).matches;
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const osDark = useSyncExternalStore(subscribe, systemPrefersDark);
+  const dark = theme === 'dark' || (theme === 'system' && osDark);
+  const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+
   return (
-    <div role="group" aria-label="Theme" className="flex gap-1">
-      {OPTIONS.map(({ value, label, Icon }) => (
-        <Button
-          key={value}
-          type="button"
-          size="sm"
-          variant={theme === value ? 'default' : 'outline'}
-          aria-pressed={theme === value}
-          onClick={() => setTheme(value)}
-          className="min-h-9 min-w-9"
-        >
-          <Icon aria-hidden="true" />
-          <span className="sr-only sm:not-sr-only">{label}</span>
-        </Button>
-      ))}
-    </div>
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      aria-label={label}
+      title={label}
+      onClick={() => setTheme(dark ? 'light' : 'dark')}
+      className="min-h-9 min-w-9"
+    >
+      {dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+    </Button>
   );
 }

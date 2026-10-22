@@ -15,3 +15,5 @@ export function formatCents(cents: number): string {
   // Intl.NumberFormat accepts an exact decimal string (needs lib ES2023 for the type).
   return zar.format(decimal as `${number}`);
 }
+const day = new Intl.DateTimeFormat('en-ZA', { dateStyle: 'medium', timeZone: 'Africa/Johannesburg' })
+export const formatDay = (iso: string) => day.format(new Date(iso))

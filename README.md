@@ -1,4 +1,4 @@
-﻿# RondiTrack
+# RondiTrack
 RondiTrack is the foundation of a backend API for managing stokvels, rotating savings groups widely used in South Africa. Built with ASP.NET Core 10 Minimal APIs, it models the real-world rules of stokvels directly in code, ensuring invalid states are impossible rather than just checked later. The project focuses on domain modeling, HTTP contracts, and resource-oriented routing, laying the groundwork for a production-ready API.
 
 Minimal APIs were chosen over Controllers because they keep the project lightweight and focused. For an assignment centered on domain modeling and HTTP fundamentals, Minimal APIs reduce boilerplate, make routes explicit, and keep the logic close to the domain rules. This clarity helps demonstrate how the API enforces fairness and accountability in stokvels.
@@ -1424,3 +1424,173 @@ Some work in the app has to happen by itself, at a certain time, with nobody cli
 - **The housekeeping job** is the tidy-up chore. It deletes old leftovers, such as expired idempotency records and tokens, so the database does not fill with junk.
 
 Why this matters for 7.2: the "In arrears" amount on a card comes from the cycle-close job. The website only shows that number; it never works out who owes what, because the server's job and clock decide that.
+
+## API contract notes
+| # | Check | What I found | Fix made |
+|---|-------|--------------|----------|
+| 1 | CORS: origin `http://localhost:3000`, credentials, exposes `Retry-After` | TODO paste the two response headers | TODO |
+| 2 | Refresh cookie: HttpOnly, rotating, path covers `/api/v1/auth` | TODO paste the Set-Cookie header | TODO |
+| 3 | `/me` and `/me/home` | TODO paste both bodies, trimmed | TODO |
+| 4 | "No next page" on contributions | TODO `nextPageToken` is `""` or `null`? The hook treats both as the end | TODO |
+| 5 | Two refreshes with the same cookie | TODO status codes you saw | Single-flight in `session.ts` |
+
+## Single-flight proof
+Failing output with `return doRefresh()` instead of `refreshing ??= ...`:
+
+    
+     RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
+    
+     â¯ src/auth/session.test.ts (5 tests | 3 failed) 290ms
+       â¯ session (5)
+         Ã— five parallel 401s cause exactly one refresh 147ms
+         Ã— a later expiry starts a new refresh 52ms
+         Ã— a failed refresh signs out once and retries nothing 26ms
+         âœ“ no token means no loop 24ms
+         âœ“ a POST body survives the retry 36ms
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 3 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
+    
+     FAIL  src/auth/session.test.ts > session > five parallel 401s cause exactly one refresh
+    AssertionError: expected 5 to be 1 // Object.is equality
+    
+    - Expected
+    + Received
+    
+    - 1
+    + 5
+    
+     â¯ src/auth/session.test.ts:41:30
+         39|     await login('a@b.co', 'pw')
+         40|     const responses = await fetchFive()
+         41|     expect(api.refreshCalls).toBe(1)
+           |                              ^
+         42|     expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200â€¦
+         43|   })
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[1/3]âŽ¯
+    
+     FAIL  src/auth/session.test.ts > session > a later expiry starts a new refresh
+    AssertionError: expected 7 to be 2 // Object.is equality
+    
+    - Expected
+    + Received
+    
+    - 2
+    + 7
+    
+     â¯ src/auth/session.test.ts:51:30
+         49|     api.valid = 'newer' // the token held now has expired
+         50|     const later = await Promise.all([authFetch(new Request(url)), authâ€¦
+         51|     expect(api.refreshCalls).toBe(2)
+           |                              ^
+         52|     expect(later.map((r) => r.status)).toEqual([200, 200])
+         53|   })
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[2/3]âŽ¯
+    
+     FAIL  src/auth/session.test.ts > session > a failed refresh signs out once and retries nothing
+    AssertionError: expected "vi.fn()" to be called 1 times, but got 3 times
+     â¯ src/auth/session.test.ts:61:23
+         59|     onSignedOut(signedOut)
+         60|     const responses = await Promise.all([1, 2, 3].map(() => authFetch(â€¦
+         61|     expect(signedOut).toHaveBeenCalledTimes(1)
+           |                       ^
+         62|     expect(api.refreshCalls).toBe(1)
+         63|     expect(api.protectedCalls).toBe(3) // each request sent once, noneâ€¦
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[3/3]âŽ¯
+    
+    
+     Test Files  1 failed (1)
+          Tests  3 failed | 2 passed (5)
+       Start at  03:05:35
+       Duration  10.43s (environment 90%, setup 6%, tests 3%, transform 1%)
+    
+
+Passing output with the line restored:
+
+    
+     RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
+    
+     âœ“ src/auth/session.test.ts (5 tests) 223ms
+    
+     Test Files  1 passed (1)
+          Tests  5 passed (5)
+       Start at  03:05:53
+       Duration  5.02s (environment 70%, setup 22%, tests 5%, transform 2%, import 1%, worker 1%)
+    
+
+## Stokvel switch proof
+Failing output with `placeholderData: keepPreviousData` added to `useContributions`:
+
+    
+     RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
+    
+     â¯ src/features/StokvelWorkspace.test.tsx (1 test | 1 failed) 1033ms
+       â¯ switching stokvels (1)
+         Ã— never shows the previous stokvel contributions after a switch 1029ms
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯ Failed Tests 1 âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯
+    
+     FAIL  src/features/StokvelWorkspace.test.tsx > switching stokvels > never shows the previous stokvel contributions after a switch
+    AssertionError: expected [ <p â€¦(1)></p>, <span â€¦(1)></span> ] to have a length of +0 but got 2
+    
+    - Expected
+    + Received
+    
+    - 0
+    + 2
+    
+     â¯ src/features/StokvelWorkspace.test.tsx:57:56
+         55|
+         56|     // immediately after the switch: no Mabena amount, the skeleton inâ€¦
+         57|     expect(screen.queryAllByText(money(MABENA.cents))).toHaveLength(0)
+           |                                                        ^
+         58|     expect(screen.queryByText('Mabena Family', { selector: 'h2' })).noâ€¦
+         59|     expect(screen.getByTestId('stokvel-skeleton')).toBeInTheDocument()
+    
+    âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯âŽ¯[1/1]âŽ¯
+    
+    
+     Test Files  1 failed (1)
+          Tests  1 failed (1)
+       Start at  03:06:06
+       Duration  11.79s (environment 42%, import 20%, transform 18%, setup 11%, tests 9%)
+    
+
+Passing output without it:
+
+    
+     RUN  v5.0.5 C:/Users/Andiswa Mbonambi/RondiTrack/web
+    
+     âœ“ src/features/StokvelWorkspace.test.tsx (1 test) 1003ms
+       âœ“ switching stokvels (1)
+         âœ“ never shows the previous stokvel contributions after a switch 1000ms
+    
+     Test Files  1 passed (1)
+          Tests  1 passed (1)
+       Start at  03:06:25
+       Duration  7.00s (environment 50%, import 23%, tests 16%, setup 6%, transform 4%)
+    
+
+Money: the API sends `amountInCents` (integers), because `0.1 + 0.2` is `0.30000000000000004` in JSON numbers, so rands as decimals would drift.
+
+## Shared phone check
+1. Signed in as member A (demo.a) and opened Mabena Family, a stokvel member B does not belong to.
+2. Signed out with the button, then signed in as member B (demo.b) without reloading the page. B saw only B's stokvels.
+3. In the TanStack Query Devtools no query for Mabena Family existed after sign-out. Screenshot:
+
+   ![Devtools after sign-out, no query for A's stokvel](docs/screenshots/devtools-no-stokvel-a.png)
+
+4. No URL state yet (routing arrives in Week 8). I did not repeat the "removed from a stokvel while it was open" check by hand for this write-up.
+
+Sign-out, by the button or a failed refresh, calls `queryClient.clear()` and remounts the tree, so the selected stokvel id goes too. Local Storage holds only `theme`, which the assignment allows. No token and no stokvel id is stored anywhere.
+
+## Known gaps
+- No screen recording is attached to this PR. I ran out of time and could not record it.
+- No routing or URL state yet, so "open another stokvel's id in the URL" is not shown.
+- `useCycles` and `useMe` exist and are typed but no screen renders cycles yet. The sign-in gate uses `/me/home`.
+- None of the stretch challenges are done. Two tabs can still race on one refresh cookie, and the loser revokes the whole token family and signs the member out everywhere. Fixing that needs a BroadcastChannel or Web Locks approach.
+- The member's stokvel list comes from `/me/home` because `GET /stokvels` is platform-admin only.
+- `npm audit` reports 7 high severity advisories that I have not triaged.
+- One backend test, `MoneyRateLimitTests`, failed once during the full 104-test run on a slow machine. I have not yet rerun it on its own, so I do not know whether it is a timing problem or a real failure. It depends on a token refilling every 10 seconds.

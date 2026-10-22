@@ -1,3 +1,4 @@
+using Microsoft.OpenApi;
 using FluentValidation;
 using RondiTrack.Authorization;
 using RondiTrack.Browser;
@@ -124,7 +125,19 @@ builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDeta
 builder.Services.AddSingleton<ITokenService, TokenService>();
 
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    // The API adds correlationId to every problem response. Declare it so the generated client types have it.
+    options.AddSchemaTransformer((schema, context, _) =>
+    {
+        if (context.JsonTypeInfo.Type == typeof(Microsoft.AspNetCore.Mvc.ProblemDetails))
+        {
+            schema.Properties ??= new Dictionary<string, IOpenApiSchema>();
+            schema.Properties["correlationId"] = new OpenApiSchema { Type = JsonSchemaType.String };
+        }
+        return Task.CompletedTask;
+    });
+});
 
 // Strict numbers: the web defaults let "100" bind to a number and make the OpenAPI document
 // describe numbers as "number or string". Strict fixes both. A JSON number sent as a string
