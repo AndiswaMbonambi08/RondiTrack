@@ -11,7 +11,7 @@ using RondiTrack.Services;
 
 namespace RondiTrack.Endpoints;
 
-public record MemberListItem(Guid UserId, DateTime JoinedAtUtc, int Role);
+public record MemberListItem(Guid UserId, DateTime JoinedAtUtc, int Role, string FullName);
 
 public static class PagedListEndpoints
 {
@@ -120,9 +120,19 @@ public static class PagedListEndpoints
 
                 var page = await service.ListAsync(stokvelId, query, ct);
                 return Results.Ok(new PagedResult<MemberListItem>(
-                    page.Items.Select(m => new MemberListItem(m.UserId, m.JoinedAtUtc, (int)m.Role)).ToList(),
+                    page.Items.Select(m => new MemberListItem(m.UserId, m.JoinedAtUtc, (int)m.Role, m.User?.FullName ?? "")).ToList(),
                     page.NextPageToken));
             })
-            .RequireAuthorization(Policies.StokvelMember);
+            .WithSummary("The members of one stokvel, with their names")
+            .WithDescription("""
+                Treasurer or Admin of the stokvel only, because it lists other members' names. This is what the
+                frontend's member picker uses when a Treasurer records a contribution on someone's behalf.
+                Paged as { items, nextPageToken } (an empty nextPageToken means no more results).
+                """)
+            .Produces<PagedResult<MemberListItem>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .RequireAuthorization(Policies.StokvelTreasurer);
     }
 }

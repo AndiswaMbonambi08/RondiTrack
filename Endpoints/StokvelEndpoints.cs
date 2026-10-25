@@ -1,4 +1,4 @@
-// Maps every /api/v1/stokvels route, including nested members and contributions,
+﻿// Maps every /api/v1/stokvels route, including nested members and contributions,
 // annotated with OpenAPI summaries, descriptions, and every realistic response type.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -166,6 +166,7 @@ public static class StokvelEndpoints
         .WithSummary("Record a member's contribution for a cycle")
         .WithDescription("""
             Members may record their own contribution. Treasurer or Admin may record anyone's (403 otherwise).
+            amountInCents is a whole number of cents (50000 is R500.00), from 1 to 100 000 000.
             Requires an Idempotency-Key header, scoped to the caller and the stokvel. Repeating the same key
             with the same body returns the original response unchanged, with an Idempotency-Replayed: true
             header. Repeating the same key with a different body returns 422.
@@ -175,7 +176,7 @@ public static class StokvelEndpoints
             to a different stokvel. Fails 409 if the user is not a member, or has already contributed for
             this cycle.
             Example request:
-            { "userId": "...", "contributionCycleId": "...", "amount": 500 }
+            { "userId": "...", "contributionCycleId": "...", "amountInCents": 50000 }
             """)
         .Produces<ContributionResponse>(StatusCodes.Status201Created)
         .ProducesProblem(StatusCodes.Status400BadRequest)

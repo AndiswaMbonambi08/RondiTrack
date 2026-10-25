@@ -1,4 +1,4 @@
-// Owns RondiTrack's cross-entity decisions. Fetches from repositories, calls the domain
+﻿// Owns RondiTrack's cross-entity decisions. Fetches from repositories, calls the domain
 // entity to enforce its own rules, and owns the idempotency check for contributions.
 using RondiTrack.Data;
 using RondiTrack.Domain.Exceptions;
@@ -75,7 +75,9 @@ public class StokvelService : IStokvelService
             throw new NotFoundException("That contribution cycle does not belong to this stokvel.");
 
         await _stokvelRepo.LoadContributionsAsync(stokvel, cycle.Id);
-        var contribution = stokvel.RecordContribution(user, cycle.Id, request.Amount);
+
+        // Cents to rands: dividing a whole number of cents by 100m is exact in decimal.
+        var contribution = stokvel.RecordContribution(user, cycle.Id, request.AmountInCents / 100m);
         _stokvelRepo.AddContribution(contribution);
         var response = contribution.ToResponse();
 

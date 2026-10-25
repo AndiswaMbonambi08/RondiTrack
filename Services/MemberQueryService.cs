@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RondiTrack.Data;
 using RondiTrack.Paging;
@@ -19,7 +19,10 @@ public class MemberQueryService(RondiTrackDbContext db)
         };
         var hash = PageTokenCodec.Hash($"{stokvelId}|{desc}|{q.Role}");
 
-        IQueryable<StokvelMember> query = db.StokvelMembers.AsNoTracking().Where(m => m.StokvelId == stokvelId);
+        // Include(User): the member picker needs names, not just ids.
+        IQueryable<StokvelMember> query = db.StokvelMembers.AsNoTracking()
+            .Include(m => m.User)
+            .Where(m => m.StokvelId == stokvelId);
         if (q.Role is { } r) query = query.Where(m => m.Role == (StokvelMemberRole)r);
 
         if (!string.IsNullOrEmpty(q.PageToken))
