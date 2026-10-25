@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+﻿import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { api, unwrap } from './client'
 
 // Every key for stokvel data starts with that stokvel's id (after 'stokvels'), so
@@ -10,6 +10,7 @@ export const queryKeys = {
   stokvel: (id: string) => ['stokvels', id] as const,
   cycles: (id: string) => ['stokvels', id, 'cycles'] as const,
   contributions: (id: string) => ['stokvels', id, 'contributions'] as const,
+  members: (id: string) => ['stokvels', id, 'members'] as const,
 }
 
 export const useMe = () =>
@@ -60,5 +61,21 @@ export const useContributions = (id: string) =>
         }),
       ),
     // check 4: the API sends "" for no next page; null or undefined would also mean stop
+    getNextPageParam: (last) => last.nextPageToken || undefined,
+  })
+
+// Treasurer or Admin only (the API answers 403 to anyone else), so the member picker only
+// turns this on for those roles. Hiding the picker is convenience; the 403 is the rule.
+export const useMembers = (id: string, enabled: boolean) =>
+  useInfiniteQuery({
+    queryKey: queryKeys.members(id),
+    enabled,
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      unwrap(
+        api.GET('/api/v1/stokvels/{stokvelId}/members', {
+          params: { path: { stokvelId: id }, query: { PageToken: pageParam } },
+        }),
+      ),
     getNextPageParam: (last) => last.nextPageToken || undefined,
   })

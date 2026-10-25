@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react'
+﻿import { useState, type ReactNode } from 'react'
 import { useContributions, useStokvel, useStokvels } from '../api/queries'
 import { logout } from '../auth/session'
 import { ErrorView } from '../components/ErrorView'
 import { Wordmark } from '../components/Wordmark'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { ContributionForm } from '../contributions/ContributionForm'
 import { formatCents, formatDay } from '../lib/money'
 
 const card = 'rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900'
@@ -90,6 +91,10 @@ function StokvelPanel({ stokvelId, onBack }: { stokvelId: string; onBack: () => 
         </div>
       </div>
 
+      <div className="mt-4">
+        <ContributionForm stokvelId={stokvelId} />
+      </div>
+
       {!contributions.data ? (
         <RowsSkeleton />
       ) : rows.length === 0 ? (
@@ -140,7 +145,7 @@ function StokvelPanel({ stokvelId, onBack }: { stokvelId: string; onBack: () => 
           onClick={() => contributions.fetchNextPage()}
           disabled={contributions.isFetchingNextPage}
         >
-          {contributions.isFetchingNextPage ? 'Loading…' : 'Load more'}
+          {contributions.isFetchingNextPage ? 'Loading...' : 'Load more'}
         </button>
       )}
     </section>
