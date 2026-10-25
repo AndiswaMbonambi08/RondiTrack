@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Logging;
@@ -62,7 +62,8 @@ public class LogLeakTests(PostgresApiFactory factory)
 
         using var contribution = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
         {
-            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount })
+            // 123456 cents is R1234.56, the same distinctive amount as above.
+            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 123456 })
         };
         contribution.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
         var recorded = await admin.SendAsync(contribution);

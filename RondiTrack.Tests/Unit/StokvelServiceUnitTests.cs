@@ -1,6 +1,6 @@
-// Unit tests against StokvelService directly, using real in-memory repositories.
-// No DI container, no HTTP. Proves the idempotency-key comparison logic and the
-// cycle-belongs-to-a-different-stokvel cross-check.
+﻿// Unit tests against StokvelService directly, using real in-memory repositories.
+// No DI container, no HTTP. Proves the idempotency-key comparison logic, the
+// cycle-belongs-to-a-different-stokvel cross-check, and the exact cents-to-rands conversion.
 using RondiTrack.Data;
 using RondiTrack.Domain;
 using RondiTrack.Domain.Exceptions;
@@ -37,7 +37,7 @@ public class StokvelServiceUnitTests
     public async Task RecordContributionAsync_SameKeySameRequest_ReturnsSameContributionIdBothTimes()
     {
         var (service, _, user, stokvel, cycle) = BuildScenario();
-        var request = new RecordContributionRequest(user.Id, cycle.Id, 100m);
+        var request = new RecordContributionRequest(user.Id, cycle.Id, 10000);
 
         var first = await service.RecordContributionAsync(stokvel.Id, request, "key-1");
         var second = await service.RecordContributionAsync(stokvel.Id, request, "key-1");
@@ -49,8 +49,8 @@ public class StokvelServiceUnitTests
     public async Task RecordContributionAsync_SameKeyDifferentAmount_ThrowsIdempotencyConflictException()
     {
         var (service, _, user, stokvel, cycle) = BuildScenario();
-        var first = new RecordContributionRequest(user.Id, cycle.Id, 100m);
-        var second = new RecordContributionRequest(user.Id, cycle.Id, 200m);
+        var first = new RecordContributionRequest(user.Id, cycle.Id, 10000);
+        var second = new RecordContributionRequest(user.Id, cycle.Id, 20000);
 
         await service.RecordContributionAsync(stokvel.Id, first, "key-1");
 
@@ -67,9 +67,25 @@ public class StokvelServiceUnitTests
         otherStokvel.AddMember(user);
         await stokvelRepo.AddAsync(otherStokvel);
 
-        var request = new RecordContributionRequest(user.Id, cycle.Id, 100m);
+        var request = new RecordContributionRequest(user.Id, cycle.Id, 10000);
 
         await Assert.ThrowsAsync<NotFoundException>(
             () => service.RecordContributionAsync(otherStokvel.Id, request, "key-1"));
+    }
+
+    [Theory]
+    [InlineData(15050L, 150.50)]
+    [InlineData(1999L, 19.99)]
+    [InlineData(1L, 0.01)]
+    [InlineData(100_000_000L, 1_000_000.00)]
+    public async Task RecordContributionAsync_ConvertsCentsToRandsExactly(long cents, double rands)
+    {
+        var (service, _, user, stokvel, cycle) = BuildScenario();
+
+        var response = await service.RecordContributionAsync(
+            stokvel.Id, new RecordContributionRequest(user.Id, cycle.Id, cents), $"key-{cents}");
+
+        Assert.Equal(cents, response.AmountCents);
+        Assert.Equal((decimal)rands, response.Amount);
     }
 }

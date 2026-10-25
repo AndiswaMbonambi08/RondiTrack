@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -109,7 +109,7 @@ public class HousekeepingJobTests : JobTestBase
     {
         var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvelId}/contributions")
         {
-            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amount = 500 })
+            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amountInCents = 50000 })
         };
         req.Headers.Add("Idempotency-Key", key);
         return Factory.CreateClient().SendAsync(req);

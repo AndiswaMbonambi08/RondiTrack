@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
@@ -95,7 +95,7 @@ public class MoneyRateLimitTests : IDisposable
     {
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvelId}/contributions")
         {
-            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amount = 500 })
+            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amountInCents = 50000 })
         };
         if (key is not null) request.Headers.Add("Idempotency-Key", key);
         return request;

@@ -1,4 +1,4 @@
-using RondiTrack.Tests.TestSupport;
+﻿using RondiTrack.Tests.TestSupport;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -29,7 +29,7 @@ public class PagingContractTests
             (await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id })).EnsureSuccessStatusCode();
 
             var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
-            { Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m }) };
+            { Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 10000 }) };
             req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
             (await _client.SendAsync(req)).EnsureSuccessStatusCode();
         }

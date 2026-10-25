@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using RondiTrack.Domain;
 using RondiTrack.Dtos;
@@ -39,7 +39,7 @@ public class ContributionResponseShapeTests(PostgresApiFactory factory)
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvelId}/contributions")
         {
-            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amount = 123.45 })
+            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amountInCents = 12345 })
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
@@ -48,6 +48,7 @@ public class ContributionResponseShapeTests(PostgresApiFactory factory)
         Assert.Equal(HttpStatusCode.Created, res.StatusCode);
         var body = (await res.Content.ReadFromJsonAsync<ContributionResponse>())!;
         Assert.Equal(12345, body.AmountCents);
+        Assert.Equal(123.45m, body.Amount);
         Assert.Equal(ContributionStatus.Paid, body.Status);
         Assert.Equal(cycleId, body.ContributionCycleId);
     }
