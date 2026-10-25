@@ -242,6 +242,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * The members of one stokvel, with their names
+         * @description Treasurer or Admin of the stokvel only, because it lists other members' names. This is what the
+         *     frontend's member picker uses when a Treasurer records a contribution on someone's behalf.
+         *     Paged as { items, nextPageToken } (an empty nextPageToken means no more results).
+         */
         get: {
             parameters: {
                 query?: {
@@ -263,7 +269,36 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["PagedResultOfMemberListItem"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
                 };
             };
         };
@@ -1112,6 +1147,7 @@ export interface paths {
         /**
          * Record a member's contribution for a cycle
          * @description Members may record their own contribution. Treasurer or Admin may record anyone's (403 otherwise).
+         *     amountInCents is a whole number of cents (50000 is R500.00), from 1 to 100 000 000.
          *     Requires an Idempotency-Key header, scoped to the caller and the stokvel. Repeating the same key
          *     with the same body returns the original response unchanged, with an Idempotency-Replayed: true
          *     header. Repeating the same key with a different body returns 422.
@@ -1121,7 +1157,7 @@ export interface paths {
          *     to a different stokvel. Fails 409 if the user is not a member, or has already contributed for
          *     this cycle.
          *     Example request:
-         *     { "userId": "...", "contributionCycleId": "...", "amount": 500 }
+         *     { "userId": "...", "contributionCycleId": "...", "amountInCents": 50000 }
          */
         post: {
             parameters: {
@@ -1654,8 +1690,21 @@ export interface components {
             /** Format: int32 */
             expiresInSeconds: number;
         };
+        MemberListItem: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: date-time */
+            joinedAtUtc: string;
+            /** Format: int32 */
+            role: number;
+            fullName: string;
+        };
         PagedResultOfContributionItemResponse: {
             items: components["schemas"]["ContributionItemResponse"][];
+            nextPageToken: string;
+        };
+        PagedResultOfMemberListItem: {
+            items: components["schemas"]["MemberListItem"][];
             nextPageToken: string;
         };
         PayoutResponse: {
@@ -1686,8 +1735,8 @@ export interface components {
             userId: string;
             /** Format: uuid */
             contributionCycleId: string;
-            /** Format: double */
-            amount: number;
+            /** Format: int64 */
+            amountInCents: number;
         };
         RegisterRequest: {
             fullName: string;
