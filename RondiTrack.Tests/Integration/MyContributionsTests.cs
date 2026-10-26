@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using RondiTrack.Domain;
@@ -59,11 +59,11 @@ public class MyContributionsTests
         return client;
     }
 
-    private async Task<ContributionResponse> PayAsync(Guid userId, Guid stokvelId, Guid cycleId, decimal amount)
+    private async Task<ContributionResponse> PayAsync(Guid userId, Guid stokvelId, Guid cycleId, long amountInCents)
     {
         var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvelId}/contributions")
         {
-            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amount })
+            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amountInCents })
         };
         req.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
         var res = await ClientFor(userId).SendAsync(req);
@@ -78,7 +78,7 @@ public class MyContributionsTests
         var stokvelId = await CreateStokvelAsync();
         await AddMemberAsync(stokvelId, userId);
         var cycleId = await CreateCycleAsync(stokvelId, "2026-10");
-        var paid = await PayAsync(userId, stokvelId, cycleId, 500m);
+        var paid = await PayAsync(userId, stokvelId, cycleId, 50000);
 
         var res = await ClientFor(userId).GetAsync($"/api/v1/stokvels/{stokvelId}/contributions");
 
@@ -102,8 +102,8 @@ public class MyContributionsTests
         await AddMemberAsync(stokvelId, me);
         await AddMemberAsync(stokvelId, other);
         var cycleId = await CreateCycleAsync(stokvelId, "2026-10");
-        var mine = await PayAsync(me, stokvelId, cycleId, 500m);
-        await PayAsync(other, stokvelId, cycleId, 250m);
+        var mine = await PayAsync(me, stokvelId, cycleId, 50000);
+        await PayAsync(other, stokvelId, cycleId, 25000);
 
         var body = await ClientFor(me).GetStringAsync($"/api/v1/stokvels/{stokvelId}/contributions");
         var page = JsonSerializer.Deserialize<Page>(body, JsonOptions.CaseInsensitive)!;

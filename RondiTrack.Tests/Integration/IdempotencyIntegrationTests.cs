@@ -1,4 +1,4 @@
-using RondiTrack.Tests.TestSupport;
+﻿using RondiTrack.Tests.TestSupport;
 // Proves idempotency through the real pipeline: repeating a request with the same key
 // returns the identical response, and reusing a key with a different payload is rejected.
 using System.Net;
@@ -32,11 +32,14 @@ public class IdempotencyIntegrationTests
         return (user, stokvel, cycle);
     }
 
+    private static string? Header(HttpResponseMessage res, string name) =>
+        res.Headers.TryGetValues(name, out var values) ? string.Join(",", values) : null;
+
     [Fact]
     public async Task SameIdempotencyKeySameBody_ReturnsIdenticalResponseBothTimes()
     {
         var (user, stokvel, cycle) = await SetupAsync();
-        var body = new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m };
+        var body = new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 10000 };
 
         var first = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions") { Content = JsonContent.Create(body) };
         first.Headers.Add("Idempotency-Key", "same-key");
@@ -48,8 +51,13 @@ public class IdempotencyIntegrationTests
         var secondResponse = await _client.SendAsync(second);
         var secondBody = await secondResponse.Content.ReadFromJsonAsync<ContributionResponse>(JsonOptions.CaseInsensitive);
 
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
+        Assert.Null(Header(firstResponse, "Idempotency-Replayed"));
+        Assert.Equal("true", Header(secondResponse, "Idempotency-Replayed"));
         Assert.Equal(firstBody!.Id, secondBody!.Id);
         Assert.Equal(firstBody.RecordedAt, secondBody.RecordedAt);
+        Assert.Equal(10000, secondBody.AmountCents);
     }
 
     [Fact]
@@ -59,14 +67,14 @@ public class IdempotencyIntegrationTests
 
         var first = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
         {
-            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m })
+            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 10000 })
         };
         first.Headers.Add("Idempotency-Key", "reused-key");
         await _client.SendAsync(first);
 
         var second = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
         {
-            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 200m })
+            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 20000 })
         };
         second.Headers.Add("Idempotency-Key", "reused-key");
         var response = await _client.SendAsync(second);

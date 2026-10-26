@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -100,7 +100,7 @@ public class HomeEndpointTests : IDisposable
         var client = ClientFor(userId);
         var pay = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvelA}/contributions")
         {
-            Content = JsonContent.Create(new { userId, contributionCycleId = cycleA, amount = 500 })
+            Content = JsonContent.Create(new { userId, contributionCycleId = cycleA, amountInCents = 50000 })
         };
         pay.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
         Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(pay)).StatusCode);

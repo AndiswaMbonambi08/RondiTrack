@@ -1,0 +1,13 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90mC:/Users/Andiswa Mbonambi/RondiTrack/web[39m
+
+ [32m✓[39m src/contributions/recordContribution.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1456[2mms[22m[39m
+   [32m✓[39m recording a contribution [2m(7)[22m
+     [33m[2m✓[22m[39m a retry after a network error sends the same key[33m 454[2mms[22m[39m
+     [33m[2m✓[22m[39m changing the amount after a failure is a new intent[33m 342[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+[2m   Start at [22m 02:52:09
+[2m   Duration [22m 6.84s[2m (environment 46%, tests 25%, import 19%, setup 7%, transform 2%)[22m
+

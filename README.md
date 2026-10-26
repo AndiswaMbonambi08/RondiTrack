@@ -1,4 +1,4 @@
-# RondiTrack
+﻿# RondiTrack
 RondiTrack is the foundation of a backend API for managing stokvels, rotating savings groups widely used in South Africa. Built with ASP.NET Core 10 Minimal APIs, it models the real-world rules of stokvels directly in code, ensuring invalid states are impossible rather than just checked later. The project focuses on domain modeling, HTTP contracts, and resource-oriented routing, laying the groundwork for a production-ready API.
 
 Minimal APIs were chosen over Controllers because they keep the project lightweight and focused. For an assignment centered on domain modeling and HTTP fundamentals, Minimal APIs reduce boilerplate, make routes explicit, and keep the logic close to the domain rules. This clarity helps demonstrate how the API enforces fairness and accountability in stokvels.
@@ -1594,3 +1594,75 @@ Sign-out, by the button or a failed refresh, calls `queryClient.clear()` and rem
 - The member's stokvel list comes from `/me/home` because `GET /stokvels` is platform-admin only.
 - `npm audit` reports 7 high severity advisories that I have not triaged.
 - One backend test, `MoneyRateLimitTests`, failed once during the full 104-test run on a slow machine. I have not yet rerun it on its own, so I do not know whether it is a timing problem or a real failure. It depends on a token refilling every 10 seconds.
+
+# Assignment 7.4: Record a contribution
+
+A member records what they paid into the open cycle, or a Treasurer records it on a member's behalf. The amount travels as integer cents. A retry after a dropped connection carries the same `Idempotency-Key`, so the money can never be recorded twice.
+
+Screen recording (2 minutes or less): <<paste link>>
+
+## Idempotency contract
+
+Each answer below comes from the running API, using `docs/proofs/contract-check.ps1`. The raw output is in `docs/proofs/contract-answers.txt` and `docs/proofs/contract-answers-part2.txt`.
+
+| # | Question | What the API does |
+|---|---|---|
+| 1 | Same key, same body | The second request returns the same status (201) and the same body, with the header `Idempotency-Replayed: true`. CORS lists that header in `Access-Control-Expose-Headers`, so the browser can read it. |
+| 2 | Same key, different amount | 422 with a `detail` and a `correlationId`. The first response is never silently replayed, so a corrected amount can't show "Recorded" for money that was never recorded. The form therefore starts a new key when the amount, member or cycle changes. |
+| 3 | New key, member already contributed this cycle | 409 with a `detail`: "'Proof Member 1' has already recorded a contribution for this cycle." |
+| 4 | Rate limit, then retry with the same key | While limited: 429 with `Retry-After: 10`. The same key after the wait returned 201, and sending it once more replayed it. A 429 does not use up the key. |
+| 5 | No `Idempotency-Key` | 400: "An Idempotency-Key header is required to record a contribution." The header is described as a header parameter in the OpenAPI document, so the generated client types it and I add no headers by hand. |
+| 6 | Preflight `OPTIONS` from `http://localhost:3000` | 204. `Access-Control-Allow-Headers` includes `Idempotency-Key`, `Access-Control-Allow-Credentials` is `true`, and the origin is echoed back. |
+
+Observation: the rate limiter runs before the endpoint, so every request spends a token, including replays and requests that end in 400. In my first run, steps 4c and 5 came back 429 for that reason. I reran them after waiting, and the results are in `contract-answers-part2.txt`.
+
+### Resubmitting after a 400, 409 or 422 with nothing changed
+
+The form keeps the same key. A 400 is never stored, so retrying is safe. A 409 means the first attempt probably landed, and the same key gets the same truthful answer again. A 422 means the key was used with a different body, so the person has to change something, which starts a new key. Keeping the key can never record money twice.
+
+### API fix made for this assignment
+
+`StokvelService` did not check the cycle's state, so the API accepted a contribution into a Closed or PaidOut cycle. It now throws a `ConflictException` (409) with a detail such as "Cycle 2026-10 is closed, so contributions can no longer be recorded for it." The idempotency replay lookup still runs first, so a retry of a payment that already landed still replays even after the cycle closes. Tests: `ClosedCycleContributionTests` (closed, paid out, and replay after close). The form shows this detail at the top when a cycle closes while it is open, so there is no frontend workaround.
+
+### How I checked the 403
+
+The API enforces it, and the form only hides the member picker as a convenience.
+
+- API level: `RecordContribution_ForSomeoneElse_AsMember_Returns403` in `StokvelAuthorizationTests`, plus `MembersList_IsForbiddenToAPlainMember` for the member list.
+- In the browser: Manually: I signed in as `proof.member1@example.com`, a plain Member of the stokvel, and the form showed no member picker. I then sent `POST /api/v1/stokvels/{id}/contributions` with my own access token but `proof.member2`'s `userId`. The API answered 403 Forbidden (problem+json, with a `correlationId`), so hiding the picker is only a convenience and the API enforces the rule..
+
+## Idempotency proof
+
+The key hook (`useIdempotencyKey`) creates a key once per intent and returns the same key until the intent changes or the payment succeeds. To prove the tests catch the bug, I broke it on purpose so that every call makes a new key (`if (true) {` instead of the intent check).
+
+- With the bug: `docs/proofs/idempotency-fail.txt`. **3 of 7 tests fail**: the network retry, the 429 and the StrictMode tests. Each asserts that two attempts carry the same key.
+- With the real code: `docs/proofs/idempotency-pass.txt`. **7 of 7 pass.**
+
+The 401 test still passes with the bug in place. The refresh-and-retry happens inside one request, below the key hook, so that test guards a different property: that `authFetch` keeps the header when it swaps the token. The two "new key" tests also still pass, which is correct, because they expect different keys.
+
+**What a key per attempt costs a real member:** a retry after a dropped connection looks to the API like a new payment. If the first attempt had actually landed, the member records the same contribution again and their stokvel shows a double payment. In RondiTrack the one-contribution-per-member-per-cycle rule would turn the second attempt into a 409, but on a flow without that rule it would take the money twice.
+
+Other test evidence: the money round-trip (every whole number of cents from 0 to 100 000) is in `src/money/money.test.ts`, and the six required MSW tests plus a StrictMode test are in `src/contributions/recordContribution.test.tsx`. The tests drive the real generated client and `authFetch`; only the network is faked, with `onUnhandledRequest: 'error'`.
+
+## Optimistic or not
+
+I did not make recording a contribution optimistic. Optimism would mean showing "Recorded" before the API has answered, and for money that is the wrong default. If the API then rejected it with a 409 (the member already paid, or the cycle just closed), the member would have seen a total that was never true, and might have acted on it, for example by not paying again or by telling the treasurer it was done. Several values only the server can know: the contribution's id, its status, the cycle's new collected total and any arrears. An optimistic update could only guess them. And to a treasurer reading "Recorded" at a meeting, the word means the money is in the books. It must not mean "the browser hopes so". So the button stays disabled until the API has answered and the home, contribution and cycle queries have refetched, and only then does the form confirm who, how much and which cycle. The cost is a short wait, which is cheap next to showing wrong money.
+
+## Known gaps
+
+- **The key is lost on reload.** The key lives in component state, so a reload during an unfinished attempt discards it. The next attempt gets a new key. If the first attempt had landed, the one-contribution-per-member-per-cycle rule returns 409, so the money is still never recorded twice, but the person sees a 409 instead of a replay. Persisting the key in `sessionStorage` would fix this and is not done.
+- **Keys saved before the cents change replay with a 422.** A stored key from before the switch to `amountInCents` no longer matches the new request shape, so it answers 422 until housekeeping deletes it after 168 hours.
+- **Two money files.** `src/lib/money.ts` is for display (`formatCents`, from 7.1) and `src/money/money.ts` is for typing (`parseRandsToCents`, `centsToInput`). They do different jobs, but merging them would be tidier.
+- **The member picker pages.** The Treasurer's picker loads one page of members, with a "Load more members" button. There is no search.
+- **StrictMode.** The key is created at submit time inside `keyFor()`, which only the submit path calls. Nothing is generated during render, so StrictMode's double render cannot make two keys for one intent. A test checks this (`StrictMode does not produce a second key for one intent`).
+- **Amount rule.** `parseRandsToCents` accepts `150`, `150.5`, `150.50`, `150,50`, `1 500,50` and `1 500.50`. Spaces or no-break spaces may group thousands in groups of exactly 3 digits. It refuses more than two decimals (`150.505`), `1,500` (three digits after a separator would need rounding or guessing), negatives, letters and empty text. It uses `BigInt` and never touches floating point. The rule is documented in the header comment of `src/money/money.ts`.
+- **Lint warning.** `npm run lint` reports one warning (0 errors): `react(refs)` on `form.handleSubmit(onSubmit)`, because the submit handler uses an `inFlight` ref as a guard against a double click. It means the React Compiler skips that component. The button is also disabled while submitting.
+- **Stretch challenges** (`sessionStorage` key, "Already recorded" message, double-click experiment, automatic retries): not done.
+
+## Checks
+
+- `npm run lint`: 0 errors, 1 warning (above).
+- `npm run build`: clean.
+- `npm test`: 12 files, 82 tests, all passing.
+- `dotnet test`: 127 passed, 0 failed.
+- Search of `src/` for `parseFloat`, `toFixed`, `Math.round` and `* 100`: the only hits are the milliseconds-per-day constants in `src/lib/dueDate.ts`, which are not money.

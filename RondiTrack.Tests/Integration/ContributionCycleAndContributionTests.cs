@@ -1,4 +1,4 @@
-using RondiTrack.Tests.TestSupport;
+﻿using RondiTrack.Tests.TestSupport;
 // Integration tests for ContributionCycle CRUD and contribution recording.
 using System.Net;
 using System.Net.Http.Json;
@@ -60,24 +60,25 @@ public class ContributionCycleAndContributionTests
 
     [Fact]
     public async Task RecordContribution_ValidMemberAndCycle_Returns201()
-{
-    var user = await CreateUserAsync();
-    var stokvel = await CreateStokvelAsync();
-    var add = await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
-    Assert.True(add.IsSuccessStatusCode, "AddMember: " + (int)add.StatusCode + " " + await add.Content.ReadAsStringAsync());
-    var cycle = await CreateCycleAsync(stokvel.Id);
-
-    var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
     {
-        Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m })
-    };
-    request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        var user = await CreateUserAsync();
+        var stokvel = await CreateStokvelAsync();
+        var add = await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
+        Assert.True(add.IsSuccessStatusCode, "AddMember: " + (int)add.StatusCode + " " + await add.Content.ReadAsStringAsync());
+        var cycle = await CreateCycleAsync(stokvel.Id);
 
-    var response = await _client.SendAsync(request);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
+        {
+            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 10000 })
+        };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
-    Assert.True(response.StatusCode == HttpStatusCode.Created,
-        "Record: " + (int)response.StatusCode + " " + await response.Content.ReadAsStringAsync());
-}
+        var response = await _client.SendAsync(request);
+
+        Assert.True(response.StatusCode == HttpStatusCode.Created,
+            "Record: " + (int)response.StatusCode + " " + await response.Content.ReadAsStringAsync());
+    }
+
     [Fact]
     public async Task RecordContribution_MissingIdempotencyKey_Returns400ProblemJson()
     {
@@ -86,7 +87,8 @@ public class ContributionCycleAndContributionTests
         await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
         var cycle = await CreateCycleAsync(stokvel.Id);
 
-        var response = await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/contributions", new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m });
+        var response = await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/contributions",
+            new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 10000 });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -101,7 +103,7 @@ public class ContributionCycleAndContributionTests
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions")
         {
-            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = -50m })
+            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = -5000 })
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
 
@@ -118,11 +120,11 @@ public class ContributionCycleAndContributionTests
         await _client.PostAsJsonAsync($"/api/v1/stokvels/{stokvel.Id}/members", new { userId = user.Id });
         var cycle = await CreateCycleAsync(stokvel.Id);
 
-        var body = new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m };
+        var body = new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 10000 };
 
         var first = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions") { Content = JsonContent.Create(body) };
         first.Headers.Add("Idempotency-Key", "key-a");
-        await _client.SendAsync(first);
+        Assert.Equal(HttpStatusCode.Created, (await _client.SendAsync(first)).StatusCode);
 
         var second = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvel.Id}/contributions") { Content = JsonContent.Create(body) };
         second.Headers.Add("Idempotency-Key", "key-b");

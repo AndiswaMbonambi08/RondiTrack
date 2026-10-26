@@ -1,4 +1,4 @@
-using RondiTrack.Tests.TestSupport;
+﻿using RondiTrack.Tests.TestSupport;
 // Edge cases found by asking: what happens before the typical case exists yet (empty
 // collection), exactly at a validator's boundary, and when two independently valid
 // inputs are combined in a way a cross-entity rule rejects.
@@ -21,7 +21,7 @@ public class EdgeCaseIntegrationTests
         _client = factory.CreateClient();
     }
 
-       [Fact]
+    [Fact]
     public async Task GetMembers_OnBrandNewStokvel_ReturnsEmptyPageNotError()
     {
         var stokvel = (await (await _client.PostAsJsonAsync("/api/v1/stokvels", new { name = "Empty Stokvel", contributionAmount = 100m }))
@@ -63,7 +63,7 @@ public class EdgeCaseIntegrationTests
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvelB.Id}/contributions")
         {
-            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amount = 100m })
+            Content = JsonContent.Create(new { userId = user.Id, contributionCycleId = cycle.Id, amountInCents = 10000 })
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
 

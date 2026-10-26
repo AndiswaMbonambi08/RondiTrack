@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,7 +69,7 @@ public class StokvelAuthorizationTests
     {
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/stokvels/{stokvelId}/contributions")
         {
-            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amount = 500 })
+            Content = JsonContent.Create(new { userId, contributionCycleId = cycleId, amountInCents = 50000 })
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
         return await client.SendAsync(request);
