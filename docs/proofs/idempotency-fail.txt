@@ -1,0 +1,95 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90mC:/Users/Andiswa Mbonambi/RondiTrack/web[39m
+
+ [31m❯[39m src/contributions/recordContribution.test.tsx [2m([22m[2m7 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[33m 668[2mms[22m[39m
+   [31m❯[39m recording a contribution [2m(7)[22m
+[31m     [31m×[31m a retry after a network error sends the same key[39m[32m 262[2mms[22m[39m
+     [32m✓[39m the next contribution gets a new key[32m 101[2mms[22m[39m
+[31m     [31m×[31m a 429 keeps the key and exposes the wait[39m[32m 121[2mms[22m[39m
+     [32m✓[39m changing the amount after a failure is a new intent[32m 29[2mms[22m[39m
+     [32m✓[39m a 401 retry keeps the key and carries the new token[32m 83[2mms[22m[39m
+     [32m✓[39m cents survive the trip: "150.50" is sent as the number 15050[32m 20[2mms[22m[39m
+[31m     [31m×[31m StrictMode does not produce a second key for one intent[39m[32m 32[2mms[22m[39m
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteExcep 
+   tion
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 3 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m 
+src/contributions/recordContribution.test.tsx[2m > [22mrecording a 
+contribution[2m > [22ma retry after a network error sends the same 
+key
+[31m[1mAssertionError[22m: expected 
+'cafa7733-ceaa-423e-b677-016018560cea' to be 
+'24e94ec8-8028-468d-915f-215d02d74171' // Object.is equality[39m
+
+Expected: [32m"24e94ec8-8028-468d-915f-215d02d74171"[39m
+Received: [31m"cafa7733-ceaa-423e-b677-016018560cea"[39m
+
+[36m [2m❯[22m 
+src/contributions/recordContribution.test.tsx:[2m112:25[22m[39m
+    [90m110|[39m     expect(seen[0].key).not.toBeNull()
+    [90m111|[39m     expect(seen[1].key).not.toBeNull()
+    [90m112|[39m     expect(seen[0].key).toBe(seen[1].key)
+    [90m   |[39m                         [31m^[39m
+    [90m113|[39m   })
+    [90m114|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m 
+src/contributions/recordContribution.test.tsx[2m > [22mrecording a 
+contribution[2m > [22ma 429 keeps the key and exposes the wait
+[31m[1mAssertionError[22m: expected 
+'3272a5e5-c9a2-4ede-a7f0-5cb889ef71c7' to be 
+'761487df-e80f-4694-96e2-2533af691f8a' // Object.is equality[39m
+
+Expected: [32m"761487df-e80f-4694-96e2-2533af691f8a"[39m
+Received: [31m"3272a5e5-c9a2-4ede-a7f0-5cb889ef71c7"[39m
+
+[36m [2m❯[22m 
+src/contributions/recordContribution.test.tsx:[2m136:25[22m[39m
+    [90m134|[39m     await attempt(hook, pay())
+    [90m135|[39m     expect(seen).toHaveLength(2)
+    [90m136|[39m     expect(seen[0].key).toBe(seen[1].key)
+    [90m   |[39m                         [31m^[39m
+    [90m137|[39m   })
+    [90m138|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m 
+src/contributions/recordContribution.test.tsx[2m > [22mrecording a 
+contribution[2m > [22mStrictMode does not produce a second key for 
+one intent
+[31m[1mAssertionError[22m: expected 
+'67a0b108-3e1a-4609-987f-3fc7ce9a24c8' to be 
+'4423f940-15d0-4edd-838a-ef0d2003e949' // Object.is equality[39m
+
+Expected: [32m"4423f940-15d0-4edd-838a-ef0d2003e949"[39m
+Received: [31m"67a0b108-3e1a-4609-987f-3fc7ce9a24c8"[39m
+
+[36m [2m❯[22m 
+src/contributions/recordContribution.test.tsx:[2m183:25[22m[39m
+    [90m181|[39m
+    [90m182|[39m     expect(seen).toHaveLength(2)
+    [90m183|[39m     expect(seen[0].key).toBe(seen[1].key)
+    [90m   |[39m                         [31m^[39m
+    [90m184|[39m   })
+    [90m185|[39m })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m4 passed[39m[22m[90m (7)[39m
+[2m   Start at [22m 02:51:46
+[2m   Duration [22m 15.60s[2m (environment 58%, transform 24%, import 7%, setup 7%, tests 5%)[22m
+
