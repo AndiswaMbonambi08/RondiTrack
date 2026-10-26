@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -28,10 +28,10 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const card = 'rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900'
+const card = 'rounded-3xl bg-white p-5 shadow-sm dark:bg-slate-900'
 const muted = 'text-slate-500 dark:text-slate-400'
 const field =
-  'mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100'
+  'mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100'
 const fieldError = 'mt-1 text-sm text-rose-700 dark:text-rose-300'
 
 const amountText = (cents: number | null | undefined) => (cents && cents > 0 ? centsToInput(cents) : '')
@@ -171,7 +171,7 @@ function ContributionFormBody({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
         >
           {label}
         </button>
