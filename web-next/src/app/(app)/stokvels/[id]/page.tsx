@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { ErrorView } from '@/components/ErrorView'
 import { StatusBadge } from '@/components/StatusBadge'
 import { readOrFail, signedInApi } from '@/lib/api'
@@ -19,21 +20,29 @@ export default async function StokvelPage({ params }: PageProps<'/stokvels/[id]'
 
   return (
     <section className="space-y-4">
-      <Link href="/stokvels" className="text-sm underline">
-        Back to my stokvels
+      {/* Arrow only. aria-label is invisible and is only read out by screen readers. */}
+      <Link
+        href="/stokvels"
+        aria-label="Back to my stokvels"
+        className="inline-flex size-11 items-center justify-center rounded-full bg-secondary text-secondary-foreground hover:bg-accent"
+      >
+        <ArrowLeft aria-hidden="true" className="size-5" />
       </Link>
-      <h1 className="break-words text-2xl font-semibold">{stokvel.name}</h1>
-      <p className="text-muted-foreground">{roleText(stokvel.role)}</p>
 
-      <dl className="grid max-w-md grid-cols-2 gap-2 text-sm">
-        <dt>Contribution</dt>
-        <dd className="whitespace-nowrap">{formatCents(stokvel.contributionCents)}</dd>
-        <dt>Members</dt>
-        <dd>{stokvel.memberCount}</dd>
-      </dl>
+      <div className="max-w-xl space-y-3 rounded-3xl bg-card p-5 shadow-sm">
+        <h1 className="break-words text-2xl font-bold tracking-tight">{stokvel.name}</h1>
+        <p className="text-muted-foreground">{roleText(stokvel.role)}</p>
 
-      <div className="max-w-md space-y-2 rounded-lg border p-4 text-sm">
-        <h2 className="font-semibold">Current cycle</h2>
+        <dl className="grid max-w-md grid-cols-2 gap-2 text-sm">
+          <dt>Contribution</dt>
+          <dd className="whitespace-nowrap font-semibold tabular-nums">{formatCents(stokvel.contributionCents)}</dd>
+          <dt>Members</dt>
+          <dd className="font-semibold">{stokvel.memberCount}</dd>
+        </dl>
+      </div>
+
+      <div className="max-w-xl space-y-2 rounded-3xl bg-card p-5 text-sm shadow-sm">
+        <h2 className="text-lg font-semibold">Current cycle</h2>
         {cycle ? (
           <>
             <p className="flex flex-wrap items-center gap-2">
@@ -44,7 +53,8 @@ export default async function StokvelPage({ params }: PageProps<'/stokvels/[id]'
               Paid so far: {cycle.contributorCount} of {stokvel.memberCount} members
             </p>
             <p>
-              Collected: <span className="whitespace-nowrap">{formatCents(cycle.collectedCents)}</span>
+              Collected:{' '}
+              <span className="whitespace-nowrap font-semibold tabular-nums">{formatCents(cycle.collectedCents)}</span>
             </p>
           </>
         ) : (
