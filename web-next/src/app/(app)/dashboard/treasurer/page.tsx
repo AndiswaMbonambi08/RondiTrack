@@ -17,23 +17,18 @@ export default async function TreasurerDashboardPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Treasurer dashboard</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Treasurer dashboard</h1>
       {mine.length === 0 ? (
-        <div className="space-y-2 rounded-lg border p-4">
+        <div className="space-y-2 rounded-3xl border border-dashed p-6">
           <p>You don&rsquo;t run any stokvels yet.</p>
-          <Link href="/dashboard/member" className="underline">
+          <Link href="/dashboard/member" className="font-medium underline">
             Go to your member dashboard
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           {mine.map((s) => (
-            <div key={s.stokvelId} className="space-y-2">
-              <StokvelCard entry={s} />
-              <Link href={`/stokvels/${s.stokvelId}`} className="text-sm underline">
-                View stokvel
-              </Link>
-            </div>
+            <StokvelCard key={s.stokvelId} entry={s} href={`/stokvels/${s.stokvelId}`} />
           ))}
         </div>
       )}

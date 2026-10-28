@@ -19,8 +19,9 @@ type Look = { label: string; Icon: LucideIcon; tone: keyof typeof TONES; extra?:
 
 const LOOKS: Record<'cycle' | 'contribution', Record<string, Look>> = {
   cycle: {
-    Open: { label: 'Open', Icon: CircleDot, tone: 'info' },
-    Closed: { label: 'Closed', Icon: Lock, tone: 'neutral' },
+    // Open is yellow and Closed is red. The icon and the word stay, so colour is never the only signal.
+    Open: { label: 'Open', Icon: CircleDot, tone: 'warning' },
+    Closed: { label: 'Closed', Icon: Lock, tone: 'danger' },
     PaidOut: { label: 'Paid out', Icon: Banknote, tone: 'violet', extra: 'border-solid font-semibold' },
   },
   contribution: {

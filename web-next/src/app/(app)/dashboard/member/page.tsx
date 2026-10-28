@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { ErrorView } from '@/components/ErrorView'
 import { StokvelCard } from '@/components/StokvelCard'
 import { readOrFail, signedInApi } from '@/lib/api'
@@ -12,18 +11,13 @@ export default async function MemberDashboardPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Member dashboard</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Member dashboard</h1>
       {home.stokvels.length === 0 ? (
-        <p className="rounded-lg border p-4">You are not in any stokvels yet.</p>
+        <p className="rounded-3xl border border-dashed p-6">You are not in any stokvels yet.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           {home.stokvels.map((s) => (
-            <div key={s.stokvelId} className="space-y-2">
-              <StokvelCard entry={s} />
-              <Link href={`/stokvels/${s.stokvelId}`} className="text-sm underline">
-                View stokvel
-              </Link>
-            </div>
+            <StokvelCard key={s.stokvelId} entry={s} href={`/stokvels/${s.stokvelId}`} />
           ))}
         </div>
       )}
