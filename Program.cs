@@ -1,4 +1,4 @@
-using Microsoft.OpenApi;
+﻿using Microsoft.OpenApi;
 using FluentValidation;
 using RondiTrack.Authorization;
 using RondiTrack.Browser;
@@ -260,6 +260,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapUserEndpoints();
 app.MapAuthEndpoints();
 app.MapStokvelEndpoints();
+app.MapStokvelDetailEndpoints();
 app.MapContributionCycleEndpoints();
 app.MapPayoutEndpoints();
 app.MapPagedListEndpoints();
