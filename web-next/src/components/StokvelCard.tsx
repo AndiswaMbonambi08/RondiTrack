@@ -1,4 +1,4 @@
-﻿import type { MeHomeEntry } from '@/api/types';
+import type { MeHomeEntry } from '@/lib/types';
 import { DueCountdown } from '@/components/DueCountdown';
 import { ArrearsBadge, StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';

@@ -1,6 +1,6 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { ContributionItem, CycleSummary } from '@/api/types';
+import type { ContributionItem, CycleSummary } from '@/lib/types';
 import { ContributionCard } from '@/components/ContributionCard';
 import { DueCountdown } from '@/components/DueCountdown';
 import { StatusBadge } from '@/components/StatusBadge';

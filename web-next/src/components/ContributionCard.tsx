@@ -1,6 +1,6 @@
-﻿import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/StatusBadge';
-import type { ContributionItem } from '@/api/types';
+import type { ContributionItem } from '@/lib/types';
 import { formatDateTime } from '@/lib/dates';
 import { formatCents } from '@/lib/money';
 

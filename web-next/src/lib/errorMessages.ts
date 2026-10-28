@@ -1,4 +1,4 @@
-import { ApiError } from '../api/apiError'
+import { ApiError } from './apiError'
 
 export type ErrorKind = 'notFound' | 'rateLimited' | 'unauthenticated' | 'validation' | 'network' | 'generic'
 
