@@ -1,6 +1,8 @@
-﻿import 'server-only'
+import 'server-only'
 import createClient from 'openapi-fetch'
 import { notFound, redirect } from 'next/navigation'
+import { ApiError, type Problem } from './apiError'
+import { parseRetryAfter } from './retryAfter'
 import type { paths } from './schema'
 import { getSession } from './session'
 
@@ -8,23 +10,6 @@ function baseUrl(): string {
   const url = process.env.API_BASE_URL
   if (!url) throw new Error('API_BASE_URL is not set')
   return url
-}
-
-// What the API's problem+json answers carry. Pages show these, never a stack trace.
-export class ApiError extends Error {
-  readonly status: number
-  readonly title: string
-  readonly detail: string | undefined
-  readonly correlationId: string | undefined
-
-  constructor(status: number, title: string, detail?: string, correlationId?: string) {
-    super(detail ?? title)
-    this.name = 'ApiError'
-    this.status = status
-    this.title = title
-    this.detail = detail
-    this.correlationId = correlationId
-  }
 }
 
 const noStore: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' })
@@ -59,15 +44,9 @@ export function readOrFail<T>(result: Result<T>): T | ApiError {
   if (response.status === 401) redirect('/login?expired=1')
   if (response.status === 404) notFound()
 
-  const problem = (typeof error === 'object' && error !== null ? error : {}) as {
-    title?: string
-    detail?: string
-    correlationId?: string
-  }
   return new ApiError(
     response.status,
-    problem.title ?? 'Request failed',
-    problem.detail,
-    problem.correlationId,
+    (typeof error === 'object' ? error : null) as Problem | null,
+    parseRetryAfter(response.headers.get('Retry-After')),
   )
 }
