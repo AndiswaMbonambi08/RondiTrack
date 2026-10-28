@@ -1,3 +1,5 @@
+'use client'
+
 import { AlarmClock } from 'lucide-react';
 import { useSaMidnightClock } from '@/hooks/useSaMidnightClock';
 import { describeDue } from '@/lib/dueDate';
