@@ -1,28 +1,28 @@
-import { useEffect, useState } from 'react'
-import { describeError } from '../lib/errorMessages'
+'use client'
 
-interface Props {
-  error: unknown
-  onRetry?: () => void
-  onBack?: () => void   // "Back to my stokvels"
-}
+import { useEffect, useState } from 'react'
+import type { ErrorDescription } from '@/lib/errorMessages'
+
+// Takes a plain description (built on the server by describeError), never an ApiError instance:
+// a class instance cannot cross the server/client boundary, plain data can.
+type Props = { description: ErrorDescription; onRetry?: () => void }
 
 function useCountdown(start: number | undefined) {
   const [left, setLeft] = useState(start ?? 0)
   useEffect(() => {
     if (!start) return
     const id = setInterval(() => setLeft((s) => Math.max(0, s - 1)), 1000)
-    return () => clearInterval(id) // never outlives the component
+    return () => clearInterval(id)
   }, [start])
   return left
 }
 
-export function ErrorView({ error, onRetry, onBack }: Props) {
-  const d = describeError(error)
+export function ErrorView({ description: d, onRetry }: Props) {
   const left = useCountdown(d.retryAfter)
-  const message = d.kind === 'rateLimited' && d.retryAfter !== undefined
-    ? `Too many requests. Try again in ${left} ${left === 1 ? 'second' : 'seconds'}.`
-    : d.message
+  const message =
+    d.kind === 'rateLimited' && d.retryAfter !== undefined
+      ? `Too many requests. Try again in ${left} ${left === 1 ? 'second' : 'seconds'}.`
+      : d.message
 
   return (
     <div role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100">
@@ -33,13 +33,8 @@ export function ErrorView({ error, onRetry, onBack }: Props) {
           Reference: <code className="select-all font-mono">{d.reference}</code>
         </p>
       )}
-      <div className="mt-3 flex gap-2">
-        {d.kind === 'notFound' && onBack && (
-          <button className="rounded bg-rose-900 px-3 py-1.5 text-sm text-white dark:bg-rose-200 dark:text-rose-950" onClick={onBack}>
-            Back to my stokvels
-          </button>
-        )}
-        {d.kind !== 'notFound' && onRetry && (
+      {onRetry && d.kind !== 'notFound' && (
+        <div className="mt-3">
           <button
             className="rounded bg-rose-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-rose-200 dark:text-rose-950"
             onClick={onRetry}
@@ -47,8 +42,8 @@ export function ErrorView({ error, onRetry, onBack }: Props) {
           >
             Try again
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
