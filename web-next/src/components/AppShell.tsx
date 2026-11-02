@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Menu, X } from 'lucide-react'
+import { PinnedStokvels } from '@/components/PinnedStokvels'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Wordmark } from '@/components/Wordmark'
 
@@ -13,6 +14,7 @@ const links = [
   { href: '/dashboard/member', label: 'Member dashboard' },
   { href: '/dashboard/treasurer', label: 'Treasurer dashboard' },
   { href: '/stokvels', label: 'My stokvels' },
+  { href: '/activity', label: 'Activity' },
 ]
 
 function NavLinks({ onNavigate }: { onNavigate: () => void }) {
@@ -96,6 +98,7 @@ export function AppShell({ footer, children }: { footer: ReactNode; children: Re
               </button>
             </div>
             <NavLinks onNavigate={close} />
+            <PinnedStokvels onNavigate={close} />
             <div className="mt-auto border-t border-emerald-300 pt-4 dark:border-emerald-800">{footer}</div>
           </aside>
         </div>
