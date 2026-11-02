@@ -30,7 +30,10 @@ Answered against the code and its tests (`RondiTrack.Tests/Integration/HistoryAn
 | 4 | A `pageToken` from one filter with a different filter? | 400 problem+json saying the token does not match the current filter or sort. The token carries a hash of stokvel, member, range and sort. The feed's token is bound to the caller. Both are tested. |
 | 5 | `?member=` for someone not in the stokvel, and a malformed date? | A malformed date, a malformed member id, a bad sort or `to` before `from` are all 400 problem+json. A well-formed member id that is not in this stokvel gives 200 with an empty list, so the endpoint cannot be used to find out who belongs where. A non-member of the stokvel gets 404. No token gets 401. |
 
-TODO(paste the passing `dotnet test` output for HistoryAndActivityTests)
+```text
+dotnet test --filter HistoryAndActivityTests
+Passed!  - Failed:     0, Passed:    16, Skipped:     0, Total:    16, Duration: 20 s - RondiTrack.Tests.dll (net10.0)
+```
 
 ## Where each piece of state lives
 
@@ -71,10 +74,20 @@ TODO(paste the passing `dotnet test` output for HistoryAndActivityTests)
 - Times in the list are shown with `formatDateTime`, which uses `Africa/Johannesburg`. Thandi's 23:30 on 31 October reads as 31 October.
 - Tests (`southAfricanDays.test.ts`): 1 to 31 October bounds, 23:30 SAST in and 00:00 SAST out, a single day is 24 hours, one end only, `to` before `from`, a year end, a leap day and rejected dates.
 
+Passing runs in three time zones (`npx vitest run src/lib/southAfricanDays.test.ts`):
+
 ```text
-TODO(paste the passing run with TZ=UTC)
-TODO(paste the passing run with TZ=Africa/Johannesburg)
-TODO(paste the passing run with TZ=America/New_York)
+TZ=UTC
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+
+TZ=Africa/Johannesburg
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+
+TZ=America/New_York
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
 ```
 
 ## Paging
@@ -84,11 +97,12 @@ TODO(paste the passing run with TZ=America/New_York)
 - **Scrolling and keyboard:** an `IntersectionObserver` on the end of the list loads the next page. A real "Load more" button does the same. A `role="status"` line says how many items are showing and when the end is reached.
 - **Not claiming "all" too early:** until the first extra page has arrived, "more" comes from page one's own token. The button stays (it uses `aria-disabled`, so keyboard focus is kept) and the status line only says the end is reached when the API's token is empty.
 - **A filter change starts again from page one:** the list has `key={JSON.stringify(filters)}`, the server renders new page one, and the query key holds the filters and page one's token, so a page from the old filter cannot appear under the new one. The app never sends a token with other filters.
+- **A session that ends while scrolling:** a 401 from `/bff/` makes the list send the person to `/login?expired=1` through the router.
 - **The 400 proof:** the request that would send the wrong token is shown below, with the API's answer. The app never makes it, because the token only ever comes from a response to the same filters and the handler builds the request from the same filters.
 
 ```text
-TODO(paste the request with a token from one filter and a different to= date, and the 400 answer)
-TODO(paste the Network tab observation: filter change makes no request with an old token)
+TODO(paste the $bad URL and the 400 output from the API)
+TODO(paste the Network tab observation: a filter change makes a new page one and no request with an old token)
 ```
 
 - **After recording a contribution:** the Server Action calls `refresh()` (the stokvel page) and `revalidatePath` for `/activity` and the history page, which refreshes the server's page one and the router's cached copy. The form then removes the `history` and `activity` queries from TanStack's cache, so later pages are fetched again. Page one's token is also part of the key, so an old cached page is not reused once page one changes.
@@ -102,15 +116,16 @@ TODO(paste the Network tab observation: filter change makes no request with an o
 - **Expired or refused session, with no sign-out:** every route to a signed-out state ends on `/login`, and `/login` and `/register` remove the saved pins when they show. As a backstop the store also records the signed-in user's id. If saved pins belong to a different user, they are cleared before they are shown.
 - **A pin for a stokvel the member has left:** it opens the not-found page and then removes itself. This needs no extra API call on every page, and the not-found page already never confirms whether a stokvel exists.
 
-TODO(paste: no hydration warnings in the console on a reload with pins saved)
+```text
+TODO(paste: Console is clean on a reload with pins saved, no hydration warnings)
+```
 
 ## Known gaps
 
 - `src/lib/schema.d.ts` was not regenerated, so the two new endpoints use the hand-written types in `src/lib/paged.ts` and a plain `fetch` in `src/lib/bff.ts`.
-- The contribution status is shown as the text the API sends. If the API sends it as a number the badge shows that number. TODO(confirm with a real response).
+- The contribution status is shown as the text the API sends. If the API sends it as a number the badge shows that number. TODO(confirm with a real response)
 - Opening `/login` while signed in removes the saved pins.
 - Pins are not limited in number.
 - A Member who types another member's id sees a plain message (the API's 403), not the list.
 - A platform admin who is not a member of a stokvel gets the not-found page there.
 - Refresh sharing is per process (from 8.2).
-- TODO(add anything the build, lint or testing turns up)
