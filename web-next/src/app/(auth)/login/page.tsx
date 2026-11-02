@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { safeNext } from '@/lib/safeNext'
+import { ForgetPinsOnMount } from '@/components/ForgetPinsOnMount'
 import { LoginForm } from './LoginForm'
 
 // searchParams is request data, so it is read inside <Suspense>.
@@ -11,6 +12,7 @@ async function LoginContent({
   const { expired, next } = await searchParams
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
+      <ForgetPinsOnMount />
       <LoginForm expired={expired === '1'} next={safeNext(next, '')} />
     </main>
   )

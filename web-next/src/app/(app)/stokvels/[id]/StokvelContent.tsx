@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { ContributionSection } from '@/components/ContributionSection'
 import { ErrorView } from '@/components/ErrorView'
 import { RecentContributions, RecentSkeleton, startRecent } from '@/components/RecentContributions'
+import { PinButton } from '@/components/PinButton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { readOrFail, signedInApi } from '@/lib/api'
 import { ApiError } from '@/lib/apiError'
@@ -55,6 +56,15 @@ export async function StokvelContent({ params }: { params: Promise<{ id: string 
 
       <div className="max-w-xl space-y-3 rounded-3xl bg-card p-5 shadow-sm">
         <h1 className="break-words text-2xl font-bold tracking-tight">{stokvel.name}</h1>
+        <div className="flex flex-wrap gap-2">
+          <PinButton stokvelId={id} name={stokvel.name} />
+          <Link
+            href={`/stokvels/${id}/contributions`}
+            className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/80"
+          >
+            Contribution history
+          </Link>
+        </div>
         <p className="text-muted-foreground">{roleText(stokvel.role)}</p>
 
         <dl className="grid max-w-md grid-cols-2 gap-2 text-sm">

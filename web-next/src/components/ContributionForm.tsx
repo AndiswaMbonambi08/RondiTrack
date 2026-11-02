@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { recordContribution, type ContributionFormState } from '@/app/actions/contributions'
 import { formatCents } from '@/lib/money'
 
@@ -35,6 +36,13 @@ export function ContributionForm(p: Props) {
     fieldErrors: {},
   }
   const [state, formAction, pending] = useActionState(recordContribution, initial)
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    if (state.status !== 'success') return
+    // Later pages cached for the history and the feed do not include this payment.
+    queryClient.removeQueries({ queryKey: ['history'] })
+    queryClient.removeQueries({ queryKey: ['activity'] })
+  }, [state, queryClient])
 
   const nameOf = (id: string) =>
     id === p.selfId ? p.selfName : (p.members?.find((m) => m.userId === id)?.fullName ?? 'the member')

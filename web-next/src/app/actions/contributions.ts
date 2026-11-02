@@ -1,6 +1,6 @@
 'use server'
 
-import { refresh } from 'next/cache'
+import { refresh, revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { signedInApi } from '@/lib/api'
@@ -116,6 +116,8 @@ export async function recordContribution(
   if (result.response.ok && result.data) {
     // The page is not cached, so refresh() re-renders it and the new total comes back in this same response.
     refresh()
+    revalidatePath('/activity')
+    revalidatePath('/stokvels/' + raw.stokvelId + '/contributions')
     return done(
       { values: { memberId: raw.memberId, amount: '' }, key: crypto.randomUUID(), keyIntent: '' },
       { status: 'success', recordedCents: result.data.amountCents },

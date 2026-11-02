@@ -1,0 +1,1 @@
+export const PINS_STORAGE_KEY = 'ronditrack-pins'

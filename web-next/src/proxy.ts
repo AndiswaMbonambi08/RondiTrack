@@ -4,6 +4,15 @@ import { decryptSession, encryptSession, SESSION_COOKIE, sessionCookieOptions } 
 
 const AUTH_PAGES = ['/login', '/register']
 
+const isBff = (pathname: string) => pathname === '/bff' || pathname.startsWith('/bff/')
+
+// /bff/ paths are called by scripts, so they get JSON, never a redirect to an HTML page.
+function unauthenticatedJson(deleteCookie: boolean) {
+  const res = NextResponse.json({ error: 'unauthenticated' }, { status: 401, headers: { 'Cache-Control': 'no-store' } })
+  if (deleteCookie) res.cookies.delete(SESSION_COOKIE)
+  return res
+}
+
 // Refresh when the 15-minute access token has less than this many seconds left. Default 2 minutes:
 // more than the API's 30 s clock skew plus a slow page that makes several API calls, and still
 // small enough that one refresh serves most of the token's life. Override only for experiments.
@@ -13,7 +22,7 @@ function marginSeconds(): number {
   return raw && Number.isFinite(n) && n >= 0 ? n : 120
 }
 
-// The proxy is a convenience: pages and actions still check the session themselves.
+// The proxy is a convenience: pages, actions and Route Handlers still check the session themselves.
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
   const isAuthPage = AUTH_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
@@ -23,6 +32,7 @@ export async function proxy(request: NextRequest) {
 
   // No session.
   if (!session) {
+    if (isBff(pathname)) return unauthenticatedJson(Boolean(raw))
     if (isAuthPage) {
       const res = NextResponse.next()
       if (raw) res.cookies.delete(SESSION_COOKIE)
@@ -52,6 +62,7 @@ export async function proxy(request: NextRequest) {
 
   // Refused: the session is over.
   if (!outcome.ok) {
+    if (isBff(pathname)) return unauthenticatedJson(true)
     const res = NextResponse.redirect(new URL('/login?expired=1', request.url), 303)
     res.cookies.delete(SESSION_COOKIE)
     return res

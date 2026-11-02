@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import './globals.css'
 
 export const metadata: Metadata = { title: 'RondiTrack' }
@@ -13,7 +14,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-screen bg-background text-foreground antialiased">{children}</body>
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <NuqsAdapter>{children}</NuqsAdapter>
+      </body>
     </html>
   )
 }
