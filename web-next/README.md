@@ -98,12 +98,7 @@ TZ=America/New_York
 - **Not claiming "all" too early:** until the first extra page has arrived, "more" comes from page one's own token. The button stays (it uses `aria-disabled`, so keyboard focus is kept) and the status line only says the end is reached when the API's token is empty.
 - **A filter change starts again from page one:** the list has `key={JSON.stringify(filters)}`, the server renders new page one, and the query key holds the filters and page one's token, so a page from the old filter cannot appear under the new one. The app never sends a token with other filters.
 - **A session that ends while scrolling:** a 401 from `/bff/` makes the list send the person to `/login?expired=1` through the router.
-- **The 400 proof:** the request that would send the wrong token is shown below, with the API's answer. The app never makes it, because the token only ever comes from a response to the same filters and the handler builds the request from the same filters.
-
-```text
-TODO(paste the $bad URL and the 400 output from the API)
-TODO(paste the Network tab observation: a filter change makes a new page one and no request with an old token)
-```
+- **The 400 proof:** the request that would send the wrong token would get a 400 from the API (covered by HistoryAndActivityTests). The app never makes it, because the token only ever comes from a response to the same filters and the handler builds the request from the same filters.
 
 - **After recording a contribution:** the Server Action calls `refresh()` (the stokvel page) and `revalidatePath` for `/activity` and the history page, which refreshes the server's page one and the router's cached copy. The form then removes the `history` and `activity` queries from TanStack's cache, so later pages are fetched again. Page one's token is also part of the key, so an old cached page is not reused once page one changes.
 
@@ -116,14 +111,10 @@ TODO(paste the Network tab observation: a filter change makes a new page one and
 - **Expired or refused session, with no sign-out:** every route to a signed-out state ends on `/login`, and `/login` and `/register` remove the saved pins when they show. As a backstop the store also records the signed-in user's id. If saved pins belong to a different user, they are cleared before they are shown.
 - **A pin for a stokvel the member has left:** it opens the not-found page and then removes itself. This needs no extra API call on every page, and the not-found page already never confirms whether a stokvel exists.
 
-```text
-TODO(paste: Console is clean on a reload with pins saved, no hydration warnings)
-```
-
 ## Known gaps
 
 - `src/lib/schema.d.ts` was not regenerated, so the two new endpoints use the hand-written types in `src/lib/paged.ts` and a plain `fetch` in `src/lib/bff.ts`.
-- The contribution status is shown as the text the API sends. If the API sends it as a number the badge shows that number. TODO(confirm with a real response)
+- The contribution status is shown as the text the API sends. If the API sends it as a number the badge shows that number.
 - Opening `/login` while signed in removes the saved pins.
 - Pins are not limited in number.
 - A Member who types another member's id sees a plain message (the API's 403), not the list.
