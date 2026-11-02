@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import type { Page } from '@/lib/paged'
 
@@ -17,18 +18,18 @@ type Props<T> = {
 }
 
 // The browser only ever calls this site (/bff/...), never the API.
+class SessionEnded extends Error {}
+
 async function fetchPage<T>(url: string): Promise<Page<T>> {
   const res = await fetch(url, { headers: { Accept: 'application/json' } })
-  if (res.status === 401) {
-    window.location.assign('/login?expired=1')
-    throw new Error('Session ended')
-  }
+  if (res.status === 401) throw new SessionEnded()
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return (await res.json()) as Page<T>
 }
 
 export function PagedList<T>({ queryKey, urlFor, initialPage, getKey, renderItem, nouns, empty }: Props<T>) {
   const sentinel = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   // Page one came from the server, so this query holds the pages AFTER it. Disabled on purpose:
   // fetchNextPage() fetches the first extra page with initialPageParam (page one's token).
@@ -40,7 +41,12 @@ export function PagedList<T>({ queryKey, urlFor, initialPage, getKey, renderItem
     getNextPageParam: (last) => last.nextPageToken || undefined,
     enabled: false,
   })
-  const { fetchNextPage, isFetching, isFetchingNextPage, isError } = query
+  const { fetchNextPage, isFetching, isFetchingNextPage, isError, error } = query
+
+  // A 401 from /bff/ means the session is over: go to the login page.
+  useEffect(() => {
+    if (error instanceof SessionEnded) router.push('/login?expired=1')
+  }, [error, router])
 
   const items = [...initialPage.items, ...(query.data?.pages.flatMap((p) => p.items) ?? [])]
   // Before the first extra page has arrived, page one's own token says whether there is more.
