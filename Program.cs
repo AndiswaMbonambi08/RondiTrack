@@ -1,4 +1,4 @@
-﻿using Microsoft.OpenApi;
+using Microsoft.OpenApi;
 using FluentValidation;
 using RondiTrack.Authorization;
 using RondiTrack.Browser;
@@ -266,6 +266,7 @@ app.MapPayoutEndpoints();
 app.MapPagedListEndpoints();
 app.MapPayoutVersionEndpoints();
 app.MapMeEndpoints();
+app.MapHistoryEndpoints();
 
 // Migrations + demo seed, under one advisory lock so replicas queue instead of racing.
 // See Data/DatabaseInitializer.cs and the README (--scale api=2).
