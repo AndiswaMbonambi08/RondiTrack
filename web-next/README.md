@@ -100,6 +100,14 @@ TZ=America/New_York
 - **A session that ends while scrolling:** a 401 from `/bff/` makes the list send the person to `/login?expired=1` through the router.
 - **The 400 proof:** the request that would send the wrong token would get a 400 from the API (covered by HistoryAndActivityTests). The app never makes it, because the token only ever comes from a response to the same filters and the handler builds the request from the same filters.
 
+```text
+GET .../contribution-history?pageSize=1                                          -> 200, nextPageToken=eyJRdWVyeUhhc2giOiJDMzlG...
+GET .../contribution-history?pageSize=1&pageToken=<that token>                    -> 200
+GET .../contribution-history?pageSize=1&to=2030-01-01T00:00:00Z&pageToken=<that token>
+  -> 400
+  pageToken does not match the current filter or sort. (application/problem+json)
+```
+
 - **After recording a contribution:** the Server Action calls `refresh()` (the stokvel page) and `revalidatePath` for `/activity` and the history page, which refreshes the server's page one and the router's cached copy. The form then removes the `history` and `activity` queries from TanStack's cache, so later pages are fetched again. Page one's token is also part of the key, so an old cached page is not reused once page one changes.
 
 ## Pinned stokvels
