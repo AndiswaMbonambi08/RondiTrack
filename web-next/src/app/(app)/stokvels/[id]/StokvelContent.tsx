@@ -10,6 +10,7 @@ import { ApiError } from '@/lib/apiError'
 import { describeError } from '@/lib/errorMessages'
 import { formatCents } from '@/lib/money'
 import { roleText } from '@/lib/roles'
+import { nowMs } from '@/lib/timing'
 
 export async function StokvelContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -20,7 +21,7 @@ export async function StokvelContent({ params }: { params: Promise<{ id: string 
   // (/me/home) and the recent contributions. FETCH_MODE=sequential awaits them one per line,
   // only to measure the difference.
   const sequential = process.env.FETCH_MODE === 'sequential'
-  const t0 = performance.now()
+  const t0 = nowMs()
 
   const detailReq = () => api.GET('/api/v1/stokvels/{id}', { params: { path: { id } } })
   const homeReq = () => api.GET('/api/v1/me/home')
@@ -31,7 +32,7 @@ export async function StokvelContent({ params }: { params: Promise<{ id: string 
     : await Promise.all([detailReq(), homeReq()])
   const recent = recentEarly ?? Promise.resolve(await startRecent(api, id))
 
-  console.log(`[stokvel ${sequential ? 'sequential' : 'parallel'}] top of the page ready in ${Math.round(performance.now() - t0)} ms`)
+  console.log(`[stokvel ${sequential ? 'sequential' : 'parallel'}] top of the page ready in ${Math.round(nowMs() - t0)} ms`)
 
   // A 404 (not a member, no such stokvel, malformed id) becomes notFound() inside readOrFail.
   const stokvel = readOrFail(detailRes)

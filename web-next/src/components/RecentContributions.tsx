@@ -4,6 +4,7 @@ import type { signedInApi } from '@/lib/api'
 import { readOrFail } from '@/lib/api'
 import { ApiError } from '@/lib/apiError'
 import { describeError } from '@/lib/errorMessages'
+import { nowMs } from '@/lib/timing'
 
 type Api = Awaited<ReturnType<typeof signedInApi>>['api']
 
@@ -44,7 +45,7 @@ export function RecentSkeleton() {
 
 export async function RecentContributions({ result, startedAt }: { result: Promise<Recent>; startedAt: number }) {
   const r = await result
-  console.log(`[stokvel] recent contributions ready ${Math.round(performance.now() - startedAt)} ms after the request started`)
+  console.log(`[stokvel] recent contributions ready ${Math.round(nowMs() - startedAt)} ms after the request started`)
 
   if (r === null) return <ErrorView description={describeError(new Error('network'))} />
   // 404 -> not-found page (from inside this boundary), 401 -> /login?expired=1.
