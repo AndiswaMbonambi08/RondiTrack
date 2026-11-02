@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { centsToInput, parseRandsToCents } from './money'
 
 describe('parseRandsToCents', () => {
@@ -38,8 +38,11 @@ describe('centsToInput', () => {
   })
 
   it('round-trips every whole number of cents from 0 to 100 000', () => {
+    // One expect at the end: 100 000 expect() calls are what made this test slow.
+    const mismatches: number[] = []
     for (let cents = 0; cents <= 100_000; cents++) {
-      expect(parseRandsToCents(centsToInput(cents))).toBe(cents)
+      if (parseRandsToCents(centsToInput(cents)) !== cents) mismatches.push(cents)
     }
-  })
+    expect(mismatches).toEqual([])
+  }, 30_000)
 })
