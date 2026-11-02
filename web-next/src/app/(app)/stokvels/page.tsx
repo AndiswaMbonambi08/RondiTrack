@@ -1,10 +1,12 @@
+import { Suspense } from 'react'
 import { ErrorView } from '@/components/ErrorView'
+import { PageSkeleton } from '@/components/PageSkeleton'
 import { StokvelCard } from '@/components/StokvelCard'
 import { readOrFail, signedInApi } from '@/lib/api'
 import { ApiError } from '@/lib/apiError'
 import { describeError } from '@/lib/errorMessages'
 
-export default async function StokvelsPage() {
+async function StokvelsContent() {
   const { api } = await signedInApi()
   const home = readOrFail(await api.GET('/api/v1/me/home'))
   if (home instanceof ApiError) return <ErrorView description={describeError(home)} />
@@ -22,5 +24,13 @@ export default async function StokvelsPage() {
         </div>
       )}
     </section>
+  )
+}
+
+export default function StokvelsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <StokvelsContent />
+    </Suspense>
   )
 }

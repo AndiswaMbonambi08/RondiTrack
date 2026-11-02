@@ -1,5 +1,7 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { ErrorView } from '@/components/ErrorView'
+import { PageSkeleton } from '@/components/PageSkeleton'
 import { StokvelCard } from '@/components/StokvelCard'
 import { readOrFail, signedInApi } from '@/lib/api'
 import { ApiError } from '@/lib/apiError'
@@ -8,7 +10,7 @@ import { stokvelsWhereTreasurer } from '@/lib/treasurer'
 
 // Everyone may open this page. It is a filtered view, not a door with a role check:
 // it lists the stokvels where THIS person is Treasurer, and for most people that is none.
-export default async function TreasurerDashboardPage() {
+async function TreasurerDashboardContent() {
   const { api } = await signedInApi()
   const home = readOrFail(await api.GET('/api/v1/me/home'))
   if (home instanceof ApiError) return <ErrorView description={describeError(home)} />
@@ -33,5 +35,13 @@ export default async function TreasurerDashboardPage() {
         </div>
       )}
     </section>
+  )
+}
+
+export default function TreasurerDashboardPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <TreasurerDashboardContent />
+    </Suspense>
   )
 }
