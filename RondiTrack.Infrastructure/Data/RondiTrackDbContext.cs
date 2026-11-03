@@ -19,6 +19,9 @@ public class RondiTrackDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Arrear> Arrears => Set<Arrear>();
     public DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
+    public DbSet<StokvelInvite> StokvelInvites => Set<StokvelInvite>();
+    public DbSet<ProofOfPayment> ProofsOfPayment => Set<ProofOfPayment>();
+    public DbSet<CloseRequest> CloseRequests => Set<CloseRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -139,6 +142,30 @@ public class RondiTrackDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(a => a.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StokvelInvite>(b =>
+        {
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Code).IsRequired().HasMaxLength(20);
+            b.HasIndex(i => i.Code).IsUnique().HasDatabaseName("ux_invites_code");
+            b.HasIndex(i => i.StokvelId).HasDatabaseName("ix_invites_stokvel");
+        });
+
+        modelBuilder.Entity<ProofOfPayment>(b =>
+        {
+            b.HasKey(p => p.Id);
+            b.Property(p => p.FileName).HasMaxLength(100);
+            b.Property(p => p.ContentType).HasMaxLength(100);
+            b.Property(p => p.Content).IsRequired();
+            b.HasIndex(p => p.ContributionId).IsUnique().HasDatabaseName("ux_proofs_contribution");
+        });
+
+        modelBuilder.Entity<CloseRequest>(b =>
+        {
+            b.HasKey(r => r.Key);
+            b.Property(r => r.Key).HasMaxLength(300);
+            b.Property(r => r.ResponseJson).IsRequired();
         });
 
         modelBuilder.Entity<IdempotencyEntry>(b =>
