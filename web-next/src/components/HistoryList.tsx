@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { PagedList } from '@/components/PagedList'
+import { ProofUpload } from '@/components/ProofUpload'
 import { StatusBadge } from '@/components/StatusBadge'
 import { formatDateTime } from '@/lib/dates'
 import type { HistoryFilterValues } from '@/lib/historyParsers'
@@ -18,9 +19,16 @@ function search(f: HistoryFilterValues, pageToken: string) {
   return p.toString()
 }
 
-type Props = { stokvelId: string; filters: HistoryFilterValues; initialPage: Page<HistoryItem> }
+type Props = {
+  stokvelId: string
+  filters: HistoryFilterValues
+  initialPage: Page<HistoryItem>
+  viewerId: string
+  /** Treasurer or Admin of THIS stokvel. The API still decides; this only hides what would not work. */
+  isTreasurer: boolean
+}
 
-export function HistoryList({ stokvelId, filters, initialPage }: Props) {
+export function HistoryList({ stokvelId, filters, initialPage, viewerId, isTreasurer }: Props) {
   const filtered = filters.member !== '' || filters.from !== null || filters.to !== null
 
   return (
@@ -40,20 +48,38 @@ export function HistoryList({ stokvelId, filters, initialPage }: Props) {
           )}
         </div>
       }
-      renderItem={(c) => (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-3">
-          <div className="min-w-0">
-            <p className="break-words font-medium">{c.memberName}</p>
-            <p className="text-sm text-muted-foreground">
-              Cycle {c.cycleLabel}, {formatDateTime(c.recordedAt)}
-            </p>
+      renderItem={(c) => {
+        const mine = c.memberId === viewerId
+        const canUpload = !c.cycleClosed && (mine || isTreasurer)
+        const canDownload = c.hasProof && (mine || isTreasurer)
+        return (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-3">
+            <div className="min-w-0">
+              <p className="break-words font-medium">{c.memberName}</p>
+              <p className="text-sm text-muted-foreground">
+                Cycle {c.cycleLabel}, {formatDateTime(c.recordedAt)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="whitespace-nowrap font-medium tabular-nums">{formatCents(c.amountCents)}</span>
+              <StatusBadge kind="contribution" status={String(c.status)} />
+            </div>
+            {(canDownload || (c.hasProof && c.cycleClosed)) && (
+              <p className="w-full text-sm">
+                {canDownload && (
+                  <a href={`/bff/stokvels/${stokvelId}/contributions/${c.id}/proof`} className="font-medium underline">
+                    Download proof of payment
+                  </a>
+                )}
+                {c.hasProof && c.cycleClosed && (
+                  <span className="ml-2 text-muted-foreground">Locked: this cycle is closed.</span>
+                )}
+              </p>
+            )}
+            {canUpload && <ProofUpload stokvelId={stokvelId} contributionId={c.id} hasProof={c.hasProof} />}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="whitespace-nowrap font-medium tabular-nums">{formatCents(c.amountCents)}</span>
-            <StatusBadge kind="contribution" status={String(c.status)} />
-          </div>
-        </div>
-      )}
+        )
+      }}
     />
   )
 }

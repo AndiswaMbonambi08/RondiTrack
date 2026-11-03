@@ -69,7 +69,14 @@ export async function ContributionHistory({ params, searchParams }: Props) {
       <HistoryFilters members={members} />
 
       {/* A new key starts the list again from page one: nothing from the old filter can remain. */}
-      <HistoryList key={JSON.stringify(filters)} stokvelId={id} filters={filters} initialPage={first.data} />
+      <HistoryList
+        key={JSON.stringify(filters)}
+        stokvelId={id}
+        filters={filters}
+        initialPage={first.data}
+        viewerId={session.userId}
+        isTreasurer={canRecordForOthers(stokvel.role)}
+      />
     </section>
   )
 }

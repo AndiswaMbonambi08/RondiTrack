@@ -10,6 +10,8 @@ export type HistoryItem = {
   recordedAt: string // UTC instant
   cycleId: string
   cycleLabel: string
+  hasProof: boolean
+  cycleClosed: boolean
 }
 
 export type ActivityItem = {
