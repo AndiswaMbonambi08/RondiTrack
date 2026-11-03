@@ -1,0 +1,117 @@
+# Assignment 8.3: RondiTrack state
+
+Deciding where each piece of the app's data should live, and building three features that prove it.
+
+## The three features
+
+1. **Contribution history with filters.** A treasurer can filter a stokvel's contributions by member, date range and order. The filters live in the web address, so copying the link shows the same list to someone else. Dates are treated as South African days: "1 to 31 October" includes a payment made at 23:30 on 31 October, which in UTC is 21:30 and would be easy to lose.
+
+   Files (all in `web-next/src/`):
+   - `lib/southAfricanDays.ts` and `lib/southAfricanDays.test.ts`
+   - `lib/historyParsers.ts` and `lib/historyParsers.test.ts`
+   - `lib/paged.ts`
+   - `lib/bff.ts`
+   - `app/bff/stokvels/[id]/history/route.ts`
+   - `app/(app)/stokvels/[id]/contributions/page.tsx` and `ContributionHistory.tsx`
+   - `components/HistoryFilters.tsx` and `components/HistoryList.tsx`
+   - `app/layout.tsx` (nuqs adapter)
+
+2. **Activity feed that keeps loading.** A new Activity page shows recent contributions, payouts and members joining across all your stokvels. Page one comes from the server, and more pages load as you scroll or when you press "Load more". The browser only talks to our own site, never straight to the API.
+
+   Files (all in `web-next/src/`):
+   - `app/bff/activity/route.ts`
+   - `app/(app)/activity/page.tsx` and `ActivityContent.tsx`
+   - `components/ActivityFeed.tsx`
+   - `components/PagedList.tsx`
+   - `components/QueryProvider.tsx`
+   - `proxy.ts` (JSON 401 for `/bff/` paths)
+   - `app/actions/contributions.ts` and `components/ContributionForm.tsx` (refresh after a payment is recorded)
+
+3. **Pinned stokvels.** You can pin the stokvels you check most and they show in the side menu. Pins are saved in the browser, not on the server. Because phones are shared in families, signing out wipes them, and so does landing on the login page after an expired session.
+
+   Files (all in `web-next/src/`):
+   - `stores/pinsStore.ts` and `lib/pinsKey.ts`
+   - `components/PinsProvider.tsx`
+   - `components/PinsOwner.tsx`
+   - `components/ForgetPinsOnMount.tsx`
+   - `components/SignOutForm.tsx`
+   - `components/PinButton.tsx` and `components/PinnedStokvels.tsx`
+   - `components/ForgetPin.tsx` and `app/(app)/stokvels/[id]/not-found.tsx`
+   - `app/(app)/layout.tsx`, `app/(auth)/login/page.tsx` and `app/(auth)/register/page.tsx`
+
+## The behind-the-scenes parts
+
+- Two new API endpoints (history and activity), with 16 tests.
+- A page token only works with the filters it came from. Using it with different filters gives a 400 error, so rows are never skipped or repeated.
+- Each kind of state has a home: URL for filters, server for page one, a cache for later pages, a small store for pins.
+
+Files:
+- `Dtos/HistoryDtos.cs`
+- `Services/ContributionHistoryQuery.cs`
+- `Services/ActivityFeedQuery.cs`
+- `Endpoints/HistoryEndpoints.cs`
+- `Program.cs` (one line: `app.MapHistoryEndpoints();`)
+- `RondiTrack.Tests/Integration/HistoryAndActivityTests.cs`
+- `web-next/package.json` and `web-next/package-lock.json` (nuqs, TanStack Query, Zustand)
+- `web-next/README.md` and `NOTES.md`
+
+## What is different in the UI
+
+- **Side menu:** a new "Activity" link, plus a "Pinned" section that appears once you pin something.
+  Files: `web-next/src/components/AppShell.tsx`, `components/PinnedStokvels.tsx`
+- **Stokvel page:** two new buttons under the name, "Pin to sidebar" (which toggles to "Unpin from sidebar") and "Contribution history".
+  Files: `web-next/src/app/(app)/stokvels/[id]/StokvelContent.tsx`, `components/PinButton.tsx`
+- **New page, Contribution history:** a Filters card (member dropdown for treasurers and admins, order, from date, to date, Clear filters), a small "Updating the list..." message while it reloads, then the list with a "Load more" button and a status line like "Showing 20 contributions."
+  Files: `web-next/src/components/HistoryFilters.tsx`, `HistoryList.tsx`, `PagedList.tsx`, `app/(app)/stokvels/[id]/contributions/`
+- **New page, Activity:** the same list style, with sentences like "Sipho contributed" and the stokvel name and time under each.
+  Files: `web-next/src/components/ActivityFeed.tsx`, `PagedList.tsx`, `app/(app)/activity/`
+- **Empty results:** a message with a "Show everything" link instead of an error.
+  Files: `web-next/src/components/HistoryList.tsx`
+- **Sign out:** looks the same, but now also clears your pins.
+  Files: `web-next/src/components/SignOutForm.tsx`, `app/(app)/layout.tsx`
+## How to run and sign in
+
+**1. Start the API** (terminal 1, from the repo root). It listens on `http://localhost:5051`.
+
+```powershell
+dotnet run
+```
+
+Leave it running. Stop the API before `dotnet test`, because it locks the DLLs.
+
+**2. Start the web app** (terminal 2). It needs `web-next/.env.local` with `API_BASE_URL=http://localhost:5051` and a `SESSION_SECRET`.
+
+```powershell
+cd web-next
+npm run dev
+```
+
+For the recording use `npm run build` then `npm start`. Open `http://localhost:3000`.
+
+**3. Check the API is up** (no browser needed):
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5051/api/v1/auth/login -ContentType 'application/json' -Body (@{ email = 'you@example.com'; password = 'your-password' } | ConvertTo-Json)
+```
+
+A token in the answer means the API works. A 401 means the email or password is wrong.
+
+**4. Signing in as a member or a treasurer**
+
+There is no separate treasurer login. A role belongs to a person in one stokvel, so the same account can be Treasurer in one stokvel and Member in another.
+
+- Sign in at `/login` with any account, or create one at `/register`.
+- Open a stokvel. The page says "You're the Treasurer", "You're an Admin" or "You're a Member".
+- To see the treasurer view (member dropdown on the history page), sign in as an account that is Treasurer or Admin of that stokvel.
+- To see the member view, sign in as an account that is only a Member there. A member only sees their own contributions.
+- To test both, use two browsers (or one normal and one private window) signed in as different accounts.
+- Your email is shown in the menu drawer (top right), above Sign out.
+
+**5. Making an account Treasurer** (a new account is not in any stokvel yet): add it to the stokvel as a member through the API, then change its role in the database. Role values are Member = 0, Treasurer = 1, Admin = 2.
+
+```sql
+UPDATE "StokvelMembers" SET "Role" = 1
+WHERE "StokvelId" = '<stokvel id>' AND "UserId" = '<user id>';
+```
+
+Sign out and back in, or reload the stokvel page, to see the new role.
