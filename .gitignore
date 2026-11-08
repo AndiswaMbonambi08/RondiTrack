@@ -533,3 +533,8 @@ proof-*.txt
 proof-*.txt
 
 proof-*.txt
+
+web-next/e2e/.auth/
+web-next/playwright-report/
+web-next/test-results/
+web-next/.lighthouse/
