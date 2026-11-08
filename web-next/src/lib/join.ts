@@ -15,7 +15,10 @@ export type JoinPreview = {
 
 export type PreviewResult =
   | { kind: 'ok'; preview: JoinPreview }
-  | { kind: 'unknown' | 'expired' | 'busy' | 'session' }
+  | { kind: 'unknown' }
+  | { kind: 'expired' }
+  | { kind: 'busy' }
+  | { kind: 'session' }
   | { kind: 'error'; reference?: string }
 
 export async function fetchJoinPreview(session: Session, code: string): Promise<PreviewResult> {
