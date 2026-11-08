@@ -2,7 +2,16 @@ import type { Metadata } from 'next'
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import './globals.css'
 
-export const metadata: Metadata = { title: 'RondiTrack' }
+export const metadata: Metadata = {
+  title: { default: 'RondiTrack', template: '%s | RondiTrack' },
+  description: 'RondiTrack helps stokvel members and treasurers record contributions, track cycles and stay on top of what is owed.',
+  openGraph: {
+    title: 'RondiTrack',
+    description: 'Record contributions, track cycles and stay on top of what is owed in your stokvel.',
+    siteName: 'RondiTrack',
+    type: 'website',
+  },
+}
 
 // Runs before first paint: saved choice wins, otherwise follow the operating system.
 const themeScript = `(function(){try{var t=localStorage.getItem('theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})()`
