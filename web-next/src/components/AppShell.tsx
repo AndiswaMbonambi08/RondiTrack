@@ -15,6 +15,7 @@ const links = [
   { href: '/dashboard/treasurer', label: 'Treasurer dashboard' },
   { href: '/stokvels', label: 'My stokvels' },
   { href: '/activity', label: 'Activity' },
+  { href: '/join', label: 'Join a stokvel' },
 ]
 
 function NavLinks({ onNavigate }: { onNavigate: () => void }) {

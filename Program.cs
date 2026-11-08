@@ -267,6 +267,9 @@ app.MapPagedListEndpoints();
 app.MapPayoutVersionEndpoints();
 app.MapMeEndpoints();
 app.MapHistoryEndpoints();
+app.MapJoinEndpoints();
+app.MapProofEndpoints();
+app.MapCloseEndpoints();
 
 // Migrations + demo seed, under one advisory lock so replicas queue instead of racing.
 // See Data/DatabaseInitializer.cs and the README (--scale api=2).

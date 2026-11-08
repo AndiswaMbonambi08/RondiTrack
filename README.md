@@ -1666,3 +1666,93 @@ I did not make recording a contribution optimistic. Optimism would mean showing 
 - `npm test`: 12 files, 82 tests, all passing.
 - `dotnet test`: 127 passed, 0 failed.
 - Search of `src/` for `parseFloat`, `toFixed`, `Math.round` and `* 100`: the only hits are the milliseconds-per-day constants in `src/lib/dueDate.ts`, which are not money.
+
+---
+
+# Assignment 9.1: Join flow, proof of payment and safe confirmations
+
+Three-step join flow, proof of payment upload and download, and a Close Cycle dialog driven by an API preview. Builds on 8.1 to 8.3. The browser never calls the API: pages, Server Actions and the `/bff/` Route Handlers do, with a token the browser cannot see.
+
+**Branch:** `assignment-9.1`
+
+## API check
+
+Answered against the code and `RondiTrack.Tests/Integration/JoinProofAndCloseTests.cs`. None of this existed, so it was built first, with tests.
+
+| # | Question | Answer |
+| --- | --- | --- |
+| 1 | Invites: create, preview, join? Unknown, expired, already a member? | `POST /stokvels/{id}/invites` (Treasurer or Admin, 1 to 30 days), `GET /invites/{code}` and `POST /invites/{code}/join` (any signed-in person). Unknown code: 404 `invite-unknown`. Expired: 410 `invite-expired`. Already a member: 409 `already-member` with the `stokvelId`. A double click makes one membership because the composite key rejects the second insert. |
+| 2 | What does the preview contain? | Exactly `stokvelName`, `rules`, `contributionCents`, `schedule`, `cycleEndDay`, `memberCount`, `alreadyMember` and `stokvelId` (null unless the caller is already a member). No names, balances or payout order. A test asserts the exact field list. Rules are set with `PUT /stokvels/{id}/rules`. |
+| 3 | Upload and download? Types, size, bytes or name? | `POST`, `GET` and `DELETE /stokvels/{id}/contributions/{contributionId}/proof`. JPEG, PNG or PDF, up to 5 MB, judged by the file's first bytes. A text file named `.pdf` is refused. Over 5 MB is 413. |
+| 4 | Who may download? | The uploader and Treasurers or Admins of that stokvel. Everyone else, including a treasurer of another stokvel, gets the same 404 as a missing file. Responses carry `X-Content-Type-Options: nosniff` and `Cache-Control: private, no-store` and are attachments. |
+| 5 | Close preview? Same code as the real close? | `GET /stokvels/{id}/cycles/{cycleId}/close-preview` returns who goes into arrears, how much, the South African date (`asOf`) and a `version`. The preview and the cycle-close job both call `ArrearsCalculator`. |
+| 6 | Contribution between preview and close? Close sent twice? | `version` is a hash of who owes how much. A changed version is 409 `stale-preview` and nothing is recorded. The version is checked again inside the transaction. The same `Idempotency-Key` returns the first result with `Idempotency-Replayed: true`, so arrears are recorded once. |
+
+```text
+dotnet test (whole suite)
+Passed!  - Failed:     0, Passed:   158, Skipped:     0, Total:   158
+```
+
+## Join flow
+
+The steps live in one module, `web-next/src/lib/joinMachine.ts`.
+
+| Step | Shows | What moves it on |
+| --- | --- | --- |
+| `code` | The invite code field (works signed out) | Continue goes to `rules` |
+| `rules` | Name, contribution, schedule, member count and rules | Continue goes to `confirm`, Back goes to `code` |
+| `confirm` | The same summary and the Join button | Join (Server Action) goes to the stokvel, Back goes to `rules` |
+
+- The step is in the URL as `/join?code=...&step=...`, so Back, a reload and the invite link all land on the right step.
+- A step with no valid code redirects to step 1, so the URL never shows one step while saying another.
+- The code stays in the URL, so nothing is asked twice (WCAG 3.3.7). Step 3 shows the stokvel, amount and schedule from the same preview.
+- Unknown, expired and already-a-member each get a screen, never an error page.
+- Joining is a Server Action with the person's own token. The button is disabled while it runs, and a repeat is answered "already a member".
+- Each step heading takes focus and reads "Step 2 of 3: ...". The step list uses `aria-current="step"`.
+- Signed out: steps 2 and 3 go to `/login?next=<step URL>` and return to the same step. `safeNext` still allows only paths on this site.
+
+## Uploads
+
+| Hop | Limit | What the person sees over it |
+| --- | --- | --- |
+| Browser | 5 MB, JPEG, PNG or PDF | A message under the input, before anything is sent |
+| Next.js Server Action | 6 MB (default is 1 MB) | The browser stops larger files first |
+| API | 5 MB, judged by the file's bytes | 413 or 400, shown under the same input |
+
+The API is the strictest hop and decides. A file just under 5 MB uploads (tested). A text file renamed `.pdf` passes the browser, is refused by the API and its message appears under the input.
+
+| Caller | Download |
+| --- | --- |
+| The uploader | The file |
+| Treasurer or Admin of that stokvel | The file |
+| Ordinary member of that stokvel | 404 |
+| Treasurer of a different stokvel | 404 |
+
+Downloads go through `/bff/stokvels/{id}/contributions/{contributionId}/proof`, which checks the session and streams the file. There is no public storage link. Once the cycle is closed the proof is locked (409 `proof-locked`) and the page does not offer replace or remove.
+
+## Closing a cycle
+
+- The preview lists each member going into arrears, the total, the South African date it counts to and a version. The API calculates it and the browser calculates nothing.
+- The dialog is a Radix alert dialog. Focus starts on Cancel, Esc closes it and focus returns to the opener. While loading it shows placeholder rows and the confirm button is disabled. The button reads like "Close October and record R 1 500,00 in arrears". It stays open while the close runs and shows the API's answer if it says no.
+- A stale preview gets 409. Nothing closes, and the dialog fetches and shows the new preview to confirm again.
+- The close carries an `Idempotency-Key` made once per preview, so a retry records arrears once.
+- Only treasurers see the button. The API refuses anyone else with 403, shown as a message and never a sign-out.
+
+## Feedback
+
+| Where | Used for | Why |
+| --- | --- | --- |
+| Inline message under the input | A wrong file | It is about one field. Never a toast |
+| Inline message in the join flow and dialog | Unknown or expired code, 403, already closed | The person is looking at it and acts on it |
+| Success toast (closes after 6 seconds) | Proof uploaded or removed, cycle closed | Short confirmation, no action needed |
+| Failure toast (stays until closed, shows the correlationId) | A 500 or the API unreachable | Unexpected, so the person can quote the reference |
+| Alert dialog | Closing a cycle | It cannot be undone and it is money |
+
+## Known gaps
+
+- No rate limit on guessing invite codes. The 429 screen exists in the web app but nothing triggers it yet.
+- A manual close does not open the next cycle. Only the cycle-close job does.
+- A contribution's owner sees a download link for a proof a treasurer uploaded, and it gives a 404.
+- Proofs are stored in the database as bytes, up to 5 MB each.
+- `schema.d.ts` was not regenerated, so the new endpoints use plain `fetch` helpers in `web-next/src/lib/apiRaw.ts`.
+- The stretch challenges are not done.

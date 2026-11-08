@@ -528,3 +528,8 @@ later.
 .env
 .env.*
 !.env.example
+proof-*.txt
+
+proof-*.txt
+
+proof-*.txt

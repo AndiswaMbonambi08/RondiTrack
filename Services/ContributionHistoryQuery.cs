@@ -85,7 +85,7 @@ public static partial class ContributionHistoryQuery
             from c in mine
             join u in db.Users.AsNoTracking() on c.UserId equals u.Id
             join cy in db.ContributionCycles.AsNoTracking() on c.ContributionCycleId equals cy.Id
-            select new { c.Id, c.UserId, u.FullName, c.Amount, c.Status, c.RecordedAt, CycleId = cy.Id, CycleLabel = cy.Label };
+            select new { c.Id, c.UserId, u.FullName, c.Amount, c.Status, c.RecordedAt, CycleId = cy.Id, CycleLabel = cy.Label, HasProof = db.ProofsOfPayment.Any(p => p.ContributionId == c.Id), CycleClosed = cy.ClosedAtUtc != null };
 
         // Id is the unique tiebreaker, always ascending.
         var ordered = p.OldestFirst
@@ -99,7 +99,7 @@ public static partial class ContributionHistoryQuery
             : "";
 
         var items = page.Select(r => new HistoryItemResponse(
-            r.Id, r.UserId, r.FullName, ToCents(r.Amount), r.Status, r.RecordedAt, r.CycleId, r.CycleLabel)).ToList();
+            r.Id, r.UserId, r.FullName, ToCents(r.Amount), r.Status, r.RecordedAt, r.CycleId, r.CycleLabel, r.HasProof, r.CycleClosed)).ToList();
         return new PagedResult<HistoryItemResponse>(items, next);
     }
 

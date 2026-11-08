@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RondiTrack.Data;
 using RondiTrack.Domain;
+using RondiTrack.Services;
 using RondiTrack.Telemetry;
 
 namespace RondiTrack.Jobs;
@@ -189,33 +190,10 @@ public class CycleCloseJob : BackgroundService
                 .Select(c => new { c.TargetAmount, c.EndDate })
                 .SingleAsync(ct);
 
-            // An impossible state (e.g. the stokvel is gone) throws here, rolling back the claim above.
-            var contributionAmount = await db.Stokvels.AsNoTracking()
-                .Where(s => s.Id == stokvelId)
-                .Select(s => (decimal?)s.ContributionAmount)
-                .SingleOrDefaultAsync(ct)
-                ?? throw new InvalidOperationException("The cycle's stokvel does not exist.");
-
-            // 2. Arrears: every member who paid less than the stokvel's contribution amount.
-            var memberIds = await db.StokvelMembers.AsNoTracking()
-                .Where(sm => sm.StokvelId == stokvelId)
-                .Select(sm => sm.UserId)
-                .ToListAsync(ct);
-
-            var paid = await db.Contributions.AsNoTracking()
-                .Where(c => c.ContributionCycleId == cycleId)
-                .GroupBy(c => c.UserId)
-                .Select(g => new { UserId = g.Key, Total = g.Sum(c => c.Amount) })
-                .ToDictionaryAsync(x => x.UserId, x => x.Total, ct);
-
-            var arrears = new List<Arrear>();
-            foreach (var memberId in memberIds)
-            {
-                var shortfall = contributionAmount - paid.GetValueOrDefault(memberId);
-                var cents = (long)Math.Round(shortfall * 100m, 0, MidpointRounding.AwayFromZero);
-                if (cents > 0)
-                    arrears.Add(new Arrear(cycleId, stokvelId, memberId, cents, nowUtc));
-            }
+            // 2. Arrears, from the code the close preview uses too. An impossible state (the stokvel is gone)
+            //    throws here, rolling back the claim above.
+            var shortfalls = await ArrearsCalculator.ComputeAsync(db, cycleId, stokvelId, ct);
+            var arrears = shortfalls.Select(s => new Arrear(cycleId, stokvelId, s.UserId, s.Cents, nowUtc)).ToList();
             db.Arrears.AddRange(arrears);
 
             // 3. Open the next cycle: the period that contains today (see the catch-up rule above).

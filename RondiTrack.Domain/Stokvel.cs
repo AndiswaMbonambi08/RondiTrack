@@ -13,6 +13,8 @@ public class Stokvel
     public Guid Id { get; }
     public string Name { get; private set; }
     public decimal ContributionAmount { get; private set; }
+    // Shown to someone previewing an invite. Set by a treasurer through PUT /stokvels/{id}/rules.
+    public string Rules { get; private set; } = "";
     public IReadOnlyList<Guid> MemberIds => _memberIds.AsReadOnly();
 
     public Stokvel(string name, decimal contributionAmount)

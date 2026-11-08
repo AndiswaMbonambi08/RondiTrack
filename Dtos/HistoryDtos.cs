@@ -14,7 +14,9 @@ public record HistoryItemResponse(
     ContributionStatus Status,
     DateTime RecordedAt,   // UTC instant
     Guid CycleId,
-    string CycleLabel);
+    string CycleLabel,
+    bool HasProof,
+    bool CycleClosed);
 
 public record ActivityQuery(int? PageSize, string? PageToken);
 

@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { PinsOwner } from '@/components/PinsOwner'
 import { PinsProvider } from '@/components/PinsProvider'
 import { QueryProvider } from '@/components/QueryProvider'
+import { ToastProvider } from '@/components/ToastProvider'
 import { SignOutForm } from '@/components/SignOutForm'
 import { getSession } from '@/lib/session'
 
@@ -34,6 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <QueryProvider>
       <PinsProvider>
+        <ToastProvider>
         <AppShell
           footer={
             <Suspense fallback={<p className="text-sm opacity-75">Loading account...</p>}>
@@ -46,6 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Suspense fallback={null}>
           <ClaimPins />
         </Suspense>
+      </ToastProvider>
       </PinsProvider>
     </QueryProvider>
   )
