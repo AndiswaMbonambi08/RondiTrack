@@ -104,7 +104,24 @@ export async function JoinContent({ searchParams }: Props) {
   }
 
   const session = await getSession()
-  if (!session) redirect(`/login?next=${encodeURIComponent(stepUrl(step, code))}`)
+
+  // Signed out (a person who has not signed in yet, or a link-preview bot): the page answers 200 and shows only
+  // a sign-in prompt. It never calls the preview endpoint, so nothing about the stokvel can leak into the
+  // HTML, and it does not redirect, so a bot that follows redirects does not end up on the login page's card.
+  if (!session) {
+    return (
+      <section key="signin" className="max-w-xl space-y-4">
+        <Steps step={step} />
+        <StepHeading>{title(step, 'Sign in to continue')}</StepHeading>
+        <div className="space-y-3 rounded-3xl bg-card p-5 shadow-sm">
+          <p className="text-sm">Sign in to see the rules and the amount, and to join.</p>
+          <Link href={`/login?next=${encodeURIComponent(stepUrl(step, code))}`} className={linkButton}>
+            Sign in to continue
+          </Link>
+        </div>
+      </section>
+    )
+  }
 
   const result = await fetchJoinPreview(session, code!)
   if (result.kind === 'session') redirect('/login?expired=1')

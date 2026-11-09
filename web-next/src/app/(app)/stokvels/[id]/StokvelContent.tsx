@@ -10,9 +10,8 @@ import { readOrFail, signedInApi } from '@/lib/api'
 import { ApiError } from '@/lib/apiError'
 import { describeError } from '@/lib/errorMessages'
 import { formatCents } from '@/lib/money'
-import { CloseCycleButton } from '@/components/CloseCycleButton'
-import { InviteButton } from '@/components/InviteButton'
-import { canRecordForOthers, roleText } from '@/lib/roles'
+import { TreasurerActions } from '@/components/TreasurerActions'
+import { roleText } from '@/lib/roles'
 import { nowMs } from '@/lib/timing'
 
 export async function StokvelContent({ params }: { params: Promise<{ id: string }> }) {
@@ -99,15 +98,7 @@ export async function StokvelContent({ params }: { params: Promise<{ id: string 
       </div>
 
       {/* Only a treasurer of THIS stokvel sees these. The API refuses anyone else who sends the request anyway. */}
-      {canRecordForOthers(stokvel.role) && (
-        <div className="max-w-xl space-y-3 rounded-3xl bg-card p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Treasurer actions</h2>
-          {cycle && cycle.status === 'Open' && (
-            <CloseCycleButton stokvelId={id} cycleId={cycle.id} cycleLabel={cycle.label} />
-          )}
-          <InviteButton stokvelId={id} />
-        </div>
-      )}
+      <TreasurerActions role={stokvel.role} stokvelId={id} cycle={cycle ? { id: cycle.id, label: cycle.label, status: cycle.status } : null} />
 
       {/* The form's own boundary: the member list (Treasurer only) never holds up the top. */}
       <Suspense fallback={<div className="h-48 max-w-xl animate-pulse rounded-3xl bg-muted" aria-busy="true" />}>
