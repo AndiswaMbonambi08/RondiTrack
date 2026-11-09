@@ -16,7 +16,7 @@ export function parseRandsToCents(text: string, max?: number): number | null {
   if (!match) return null
 
   const whole = Number(match[1].replace(/[ \u00a0\u202f]/g, ''))
-  const fraction = Number((match[2] ?? '').padEnd(2, '0'))
+  const fraction = Number((match[2] ?? '').padStart(2, '0'))
 
   // Whole numbers only, so this stays exact up to Number.MAX_SAFE_INTEGER. Anything bigger
   // is refused instead of being silently rounded.
