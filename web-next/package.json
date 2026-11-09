@@ -55,7 +55,7 @@
     "openapi-typescript": "7.13.0",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
-    "vitest": "5.0.5",
+    "vitest": "4.1.12",
     "web-vitals": "6.2.3"
   },
   "overrides": {

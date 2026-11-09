@@ -128,3 +128,120 @@ GET .../contribution-history?pageSize=1&to=2030-01-01T00:00:00Z&pageToken=<that 
 - A Member who types another member's id sees a plain message (the API's 403), not the list.
 - A platform admin who is not a member of a stokvel gets the not-found page there.
 - Refresh sharing is per process (from 8.2).
+
+---
+
+# Assignment 9.2: Tests, performance and accessibility
+
+## Plan
+
+| # | Question | Answer |
+| --- | --- | --- |
+| 1 | Which rules are pure functions, and which were buried? | Pure: `parseRandsToCents`, `centsToInput`, `MAX_CENTS` (`src/money/money.ts`), `formatCents`, the South African date helpers (`dates`, `southAfricanDays`), `historyParsers`, `joinMachine`, `proofRules`, `safeNext`, `contributionErrors`. **Buried, now moved out:** the Idempotency-Key rule was inside the `recordContribution` Server Action and is now `lib/idempotency.ts` (`intentOf`, `chooseKey`). The treasurer-only block was inside `StokvelContent.tsx` and is now `components/TreasurerActions.tsx`, so a test can render it. |
+| 2 | Which tool for each part? | **Vitest** for pure rules (cheapest, no browser). **Vitest + React Testing Library + userEvent** for client components with a fake Server Action: the contribution form and the role views. Vitest cannot render async Server Components, so nothing here tries. **Playwright** for anything that needs a page, a cookie, a redirect, a header or the real API: the journey, the 403, the signed-out redirect, axe, noindex and the invite head. **Manual** for what only a person can judge: keyboard order, what a screen reader says, 400% zoom, reduced motion. |
+| 3 | Edges of the contribution form, and what stands in for each | The Server Action `recordContribution` is replaced with `vi.fn()` at the module boundary. The router (`next/navigation`) and the other actions (`createInvite`, `closeCycle`) are replaced the same way in the role test. Nothing inside the component (state, hooks) is mocked, so the tests exercise the real component. The URL plays no part in this form. |
+| 4 | Login limit, and how tests sign in | `appsettings.json` allows 5 logins per 60 s (`RateLimit:Login`). The `setup` project signs in **once**: Sipho in the browser, saved to `e2e/.auth/sipho.json`. It also makes two API logins (Sipho, Thandiwe) so tests can create their own data. That is 3 logins per run, and the API login waits and retries once on a 429. Every test saves the session back afterwards, because the refresh token rotates. CI starts Compose with a fresh database. The seeded users get a password generated in that run and masked in the logs, so no real secret is in the workflow. `e2e/.auth` is git-ignored. |
+| 5 | Routes | See "Metadata and indexing". |
+| 6 | LCP element on a phone, and what it waits for | The LCP element on the home screen is ``. See the Performance section for what it waits for. |
+| 7 | Dragging, and typing from memory | Nothing in `web-next` is reordered by dragging (there is no payout-rotation screen in this app), so SC 2.5.7 has nothing to fix here. Typing from memory: the sign-in form uses `autocomplete="username"` and `"current-password"` (checked in `LoginForm.tsx`) and has no paste blocker. The invite code can be pasted and stays in the URL, so Back never asks for it again (SC 3.3.7, 3.3.8). |
+
+## Running the tests
+
+```text
+Unit and component tests (no server needed):
+  cd web-next
+  npm test                 # Vitest once
+  npm run test:tz          # Vitest with TZ=UTC and TZ=Africa/Johannesburg
+  npm run test:repeat      # ten runs in a row
+
+End-to-end tests (production build, never next dev). Must be running first:
+  docker compose -f compose.yaml -f compose.e2e.yaml up -d --build     # API on localhost:5051, database, seed incl. the 40-member stokvel
+  $env:SEED_DEMO_PASSWORD = '<the demo password in .env>'
+  $env:API_BASE_URL = 'http://localhost:5051'                           # web-next/.env.local also needs SESSION_SECRET
+  cd web-next
+  npm run build
+  npx playwright install chromium                                       # once
+  npm run test:e2e                # starts `npm run start` itself and runs setup first
+  npm run test:e2e:repeat         # three runs in a row
+  npm run test:e2e:perf           # INP (web-vitals, 4x CPU), excluded from CI
+
+Lighthouse (mobile profile, median of 3, `npm run start` running):
+  npx playwright test --project=setup
+  npm run lh -- before            # and, after the fixes: npm run lh -- after
+```
+
+## What's checked where
+
+| Behaviour | Test file or manual check | Tool |
+| --- | --- | --- |
+| Money parsing: South African formats, refusals, maximum, no float, round trip | `src/money/money.edge.test.ts`, `src/money/money.test.ts` | Vitest |
+| Dates in both time zones (23:30 on the last day) | `src/lib/dates.test.ts`, `src/lib/southAfricanDays.test.ts`, `npm run test:tz` and both CI steps | Vitest, TZ=UTC and TZ=Africa/Johannesburg |
+| One click, one request. Same key on a retry, a different key for the next contribution | `src/components/ContributionForm.test.tsx` | Vitest + RTL + userEvent, fake Server Action |
+| Every answer the form shows (400 under the field, 409 with reference, success, typed value kept) | `src/components/ContributionForm.test.tsx`, `src/lib/contributionErrors.test.ts` | Vitest + RTL |
+| Key rule | `src/lib/idempotency.test.ts` | Vitest |
+| Roles belong to a stokvel (treasurer in one, member in the other) | `src/components/roles.test.tsx` (fixtures typed from the generated API types, `queryByRole`) | Vitest + RTL |
+| The UI is not the rule: a member gets the API's 403 and stays signed in | `e2e/roles.spec.ts` | Playwright |
+| Signed-out redirect with `?next=`, JSON 401 from `/bff/` | `e2e/signed-out.spec.ts` | Playwright |
+| The journey: record R 150,50, total up by exactly 15 050 cents, no reload | `e2e/journey.spec.ts` | Playwright |
+| WCAG 2.2 AA axe on the home screen, a stokvel, the form with errors, the Close Cycle dialog | `e2e/a11y.spec.ts` | Playwright + axe |
+| noindex on signed-in pages, `X-Robots-Tag` on `/bff/`, no Disallow in robots.txt, invite head has no name or amount | `e2e/metadata.spec.ts` | Playwright |
+| INP under 200 ms | `e2e/inp.spec.ts` (`@perf`, not in CI) | Playwright + web-vitals |
+| LCP, CLS, TBT | `scripts/lighthouse-median.mjs` | Lighthouse |
+| Keyboard order, screen reader, 400% zoom, reduced motion | Manual, see "Accessibility" | Keyboard, NVDA or VoiceOver |
+
+## Accessibility
+
+axe covers part of the problem. It cannot tell whether focus went to the right place or whether an announcement made sense, so the last column says who found each row.
+
+| Criterion | Flow | What failed | Fix | How checked | Found by |
+| --- | --- | --- | --- | --- | --- |
+| 1.3.1 / 4.1.2 field error tied to its field | Record a contribution (member picker) | The member field's error was not tied to the field | `aria-describedby` and `id` on the member error in `ContributionForm.tsx` | Same pattern as the amount field, which `ContributionForm.test.tsx` checks with `toHaveAccessibleDescription` | Me, reading the form while writing its tests |
+| 2.4.11 Focus not obscured | Long lists, toasts at the bottom | A sticky header or a toast could cover the focused element | `scroll-padding-top` and `scroll-padding-bottom` in `globals.css` | Tab through the contribution list at phone width | Manual |
+| 2.5.7 Dragging | Payout rotation | Nothing drags in this app | None needed | The app has no rotation screen | Manual |
+| FILL | FILL | FILL | FILL | FILL | FILL |
+
+## Performance
+
+Measured with Lighthouse mobile (simulated slow 4G, 4x CPU) on `npm run start`, signed in, against the seeded "Load Test Stokvel" (40 members, 12 cycles). Median of 3. The raw reports are in `web-next/.lighthouse/` (git-ignored).
+
+| Page | Metric | Before | After | The change that made the difference |
+| --- | --- | --- | --- | --- |
+| home | LCP (target under 2.5 s) |  ms |  ms | FILL (the change that made the difference) |
+| home | CLS (target under 0.1) |  |  | FILL (the change that made the difference) |
+| home | TBT |  ms |  ms | FILL (the change that made the difference) |
+| stokvel | LCP (target under 2.5 s) |  ms |  ms | FILL (the change that made the difference) |
+| stokvel | CLS (target under 0.1) |  |  | FILL (the change that made the difference) |
+| stokvel | TBT |  ms |  ms | FILL (the change that made the difference) |
+| home | INP (target under 200 ms) | n/a (needs interactions) | FILL (the "INP:" line in proof-inp-9-2.txt) | measured by `e2e/inp.spec.ts` |
+
+`next/image` is not used anywhere in the app, so nothing needed `sizes`. Proofs of payment never go near the image optimizer: they are served as attachments through `/bff/stokvels/{id}/contributions/{contributionId}/proof` with `Cache-Control: private, no-store`.
+
+## Metadata and indexing
+
+| Route | Public? | Indexed? | What a link preview shows |
+| --- | --- | --- | --- |
+| `/` (landing), `/login`, `/register` | Yes | Yes (root layout metadata: title, description, Open Graph) | What RondiTrack is |
+| `/join?code=...` | Yes (works signed out) | No (`robots` noindex, the code is in the URL) | "You have been invited to a stokvel": generic, no names, no amounts, and not whether the invite is valid |
+| `/stokvels`, `/stokvels/[id]`, `/stokvels/[id]/contributions`, `/activity`, `/dashboard/*` | No (session) | No: noindex set once in `src/app/(app)/layout.tsx` | Nothing beyond the product name |
+| `/bff/*`, downloads | No | No: `X-Robots-Tag: noindex, nofollow` from `next.config.ts` | Never fetched by a bot with no session |
+| `/robots.txt` | Yes | n/a | Allows everything. Deliberately no `Disallow`: a crawler that cannot fetch a page never sees its noindex |
+
+**How the invite page treats a signed-out bot.** The preview endpoint needs a signed-in person and the bot has no session, so the head cannot depend on the invite. The metadata is static and generic. A signed-out request for step 2 or 3 gets a 200 page with a "Sign in to continue" prompt and does not redirect, because a bot that followed a redirect would show the login page's card instead of an invite card. The page never calls the API when signed out, so no stokvel data can reach the HTML. `e2e/metadata.spec.ts` proves this with a `WhatsApp/2` user agent: the title, description and every `og:` tag are checked, and the stokvel name is checked in the whole page. The curl `<head>` is in the PR description.
+
+## CI
+
+- Red run (money parser broken on purpose): 
+- Green run after the fix: 
+
+Jobs: `build-and-test` (backend) and `frontend` (npm ci, lint, `next typegen` + tsc, Vitest in UTC and in Africa/Johannesburg) run side by side. `e2e` runs only after both pass: Compose with throwaway secrets generated in the run and a fresh database, Chromium, a production build, Playwright (axe and metadata included). The HTML report is kept as an artifact when the run fails.
+
+## A test that found a bug
+
+The old `money.test.ts` expected `R150` to be refused, which the 9.2 brief reverses, so the test failed in every Vitest run until it was updated. That was a stale test, not an app bug. While writing the form tests I also found a real accessibility bug: the member field's error was not tied to its field (see the first row of the accessibility table, fixed with `aria-describedby`).
+
+## Known gaps
+
+- The 403 test calls the `/bff/` close-preview route. A member never sees the Close Cycle button, so the dialog's "Only a treasurer of this stokvel can close a cycle" message cannot be reached through the UI, and a Server Action cannot be called directly from Playwright without its generated id.
+- INP is measured by an `@perf` test that CI skips, because CPU throttling makes it timing-sensitive on shared runners.
+- Vitest is 4.1.12 (the brief names 4.1.12).
+- The stretch challenges (Lighthouse CI budgets, MSW for "Load more") are not done.
