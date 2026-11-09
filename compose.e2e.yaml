@@ -1,0 +1,7 @@
+# Used with compose.yaml for the end-to-end tests and Lighthouse:
+#   docker compose -f compose.yaml -f compose.e2e.yaml up -d --build
+# It only adds the 40-member demo stokvel. No secrets live here.
+services:
+  api:
+    environment:
+      Seed__LoadDemo: "true"

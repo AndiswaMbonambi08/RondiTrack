@@ -1,7 +1,10 @@
-﻿// Startup work: apply migrations, then (if Seed:Enabled) create the demo data.
+// Startup work: apply migrations, then (if Seed:Enabled) create the demo data.
 // Both run under one PostgreSQL advisory lock, so with `--scale api=2` the replicas queue up instead
 // of racing: the second one waits, then finds the users already there and only syncs its in-memory store.
 // The lock is session-level, so it is always released explicitly before the connection goes back to the pool.
+//
+// Seed:LoadDemo (default false) adds ONE extra stokvel with 40 members and a year of contributions, for
+// Lighthouse and the end-to-end tests. It is added to an existing database too, and only once.
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -15,6 +18,8 @@ public static class DatabaseInitializer
 {
     // Any constant works as long as every replica uses the same one.
     private const long StartupLockKey = 724_600_001;
+
+    public const string LoadDemoStokvelName = "Load Test Stokvel";
 
     public static async Task InitializeAsync(IServiceProvider services, IConfiguration config)
     {
@@ -31,6 +36,7 @@ public static class DatabaseInitializer
             {
                 await db.Database.MigrateAsync();
                 await SyncOrSeedAsync(sp, db, config, logger);
+                await SeedLoadDemoAsync(sp, db, config, logger);
             }
             finally
             {
@@ -144,5 +150,68 @@ public static class DatabaseInitializer
 
         // One SaveChanges: the whole seed is all-or-nothing.
         await db.SaveChangesAsync();
+    }
+
+    // 40 members (39 new people plus Sipho as Treasurer), 12 cycles, a contribution per member per cycle.
+    // Only runs when Seed:LoadDemo is true, and only if the stokvel is not there yet.
+    private static async Task SeedLoadDemoAsync(
+        IServiceProvider sp, RondiTrackDbContext db, IConfiguration config, ILogger logger)
+    {
+        if (!config.GetValue("Seed:LoadDemo", false)) return;
+        if (await db.Stokvels.AsNoTracking().AnyAsync(s => s.Name == LoadDemoStokvelName)) return;
+
+        var sipho = await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Email == "sipho@example.com");
+        if (sipho is null)
+        {
+            logger.LogWarning("Seed:LoadDemo needs the demo user sipho@example.com, which does not exist. Skipped.");
+            return;
+        }
+
+        var time = sp.GetRequiredService<TimeProvider>();
+        var cycleOptions = sp.GetRequiredService<IOptions<CycleCloseOptions>>().Value;
+        var inMemoryUsers = sp.GetRequiredService<InMemoryUserRepository>();
+        var now = time.GetUtcNow();
+        var today = CycleCalendar.Today(now, cycleOptions.ResolveTimeZone());
+        var joinedAtUtc = now.UtcDateTime.AddDays(-365);
+
+        var stokvel = new Stokvel(LoadDemoStokvelName, 500m);
+        var people = Enumerable.Range(1, 39)
+            .Select(i => new User($"Load Member {i:00}", $"load{i:00}@example.com"))
+            .ToList();
+
+        db.Users.AddRange(people);
+        db.Stokvels.Add(stokvel);
+        db.StokvelMembers.Add(new StokvelMember(stokvel.Id, sipho.Id, StokvelMemberRole.Treasurer, joinedAtUtc));
+        foreach (var p in people)
+            db.StokvelMembers.Add(new StokvelMember(stokvel.Id, p.Id, StokvelMemberRole.Member, joinedAtUtc));
+
+        var everyone = people.Select(p => p.Id).Append(sipho.Id).ToList();
+        var (_, currentEnd) = CycleCalendar.PeriodContaining(today, cycleOptions.CycleEndDay);
+
+        for (var k = 11; k >= 0; k--)
+        {
+            var end = currentEnd.AddMonths(-k);
+            var start = currentEnd.AddMonths(-k - 1).AddDays(1);
+            var cycle = new ContributionCycle(stokvel.Id, CycleCalendar.Label(end), 500m, start, end);
+            var isCurrent = k == 0;
+            if (!isCurrent)
+                cycle.MarkClosedForSeed(end.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+            db.ContributionCycles.Add(cycle);
+
+            // Older cycles: everybody paid. The current one: two thirds have paid so far.
+            var payers = isCurrent ? everyone.Take(everyone.Count * 2 / 3).ToList() : everyone;
+            var n = 0;
+            foreach (var memberId in payers)
+            {
+                var paidAt = start.ToDateTime(new TimeOnly(8, 0), DateTimeKind.Utc).AddDays(n++ % 10);
+                db.Contributions.Add(new Contribution(
+                    stokvel.Id, memberId, cycle.Id, 500m, paidAt,
+                    isCurrent ? ContributionStatus.Paid : ContributionStatus.Confirmed));
+            }
+        }
+
+        await db.SaveChangesAsync();
+        foreach (var p in people) await inMemoryUsers.AddAsync(p);
+        logger.LogInformation("Seed:LoadDemo created '{Name}' with 40 members and 12 cycles.", LoadDemoStokvelName);
     }
 }
