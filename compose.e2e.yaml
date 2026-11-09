@@ -1,7 +1,10 @@
 # Used with compose.yaml for the end-to-end tests and Lighthouse:
 #   docker compose -f compose.yaml -f compose.e2e.yaml up -d --build
-# It only adds the 40-member demo stokvel. No secrets live here.
+# It pins the API to localhost:5051 (compose.yaml would pick any port from 8080 to 8089) and adds the
+# 40-member demo stokvel. Needs Docker Compose 2.24 or newer for "!override". No secrets live here.
 services:
   api:
+    ports: !override
+      - "5051:8080"
     environment:
       Seed__LoadDemo: "true"

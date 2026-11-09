@@ -22,21 +22,30 @@ function subjectOf(token: string): string {
   return payload.sub
 }
 
-// The API allows 5 logins per minute per the RateLimit:Login setting. One run uses 3 (two here, one in the browser).
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+// The API allows 5 logins per minute (RateLimit:Login). One run uses 3 (two here, one in the browser).
+// If a previous run was less than a minute ago, wait for Retry-After once instead of failing.
 export async function apiLogin(email: string): Promise<Login> {
-  const res = await fetch(`${API_URL}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: demoPassword() }),
-  })
-  if (res.status === 429) {
-    throw new Error(`Login rate limit reached. Wait ${res.headers.get('Retry-After') ?? '60'} seconds and run again.`)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(`${API_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: demoPassword() }),
+    })
+    if (res.status === 429 && attempt === 0) {
+      const wait = Math.min(Number(res.headers.get('Retry-After') ?? '60'), 65)
+      await sleep((Number.isFinite(wait) ? wait : 60) * 1000 + 500)
+      continue
+    }
+    if (res.status === 429) throw new Error('Login rate limit reached twice. Wait a minute and run again.')
+    if (!res.ok) throw new Error(`Login for ${email} failed with ${res.status}.`)
+    const body = (await res.json()) as Record<string, unknown>
+    const token = [body.accessToken, body.token, body.access_token].find((v): v is string => typeof v === 'string')
+    if (!token) throw new Error(`No access token in the login answer. Keys: ${Object.keys(body).join(', ')}`)
+    return { token, userId: subjectOf(token) }
   }
-  if (!res.ok) throw new Error(`Login for ${email} failed with ${res.status}.`)
-  const body = (await res.json()) as Record<string, unknown>
-  const token = [body.accessToken, body.token, body.access_token].find((v): v is string => typeof v === 'string')
-  if (!token) throw new Error(`No access token in the login answer. Keys: ${Object.keys(body).join(', ')}`)
-  return { token, userId: subjectOf(token) }
+  throw new Error('unreachable')
 }
 
 export function tokens(): Tokens {
