@@ -13,6 +13,5 @@ test('a signed-out /bff/ fetch gets a JSON 401, not HTML', async ({ request }) =
   const res = await request.get('/bff/activity', { maxRedirects: 0 })
   expect(res.status()).toBe(401)
   expect(res.headers()['content-type']).toContain('application/json')
-  expect(() => JSON.parse(String.raw`${'' + (res.ok() ? '' : '')}`) ?? null).not.toThrow()
-  await expect(res.json()).resolves.toBeTruthy()
+  expect(await res.json()).toBeTruthy()
 })
