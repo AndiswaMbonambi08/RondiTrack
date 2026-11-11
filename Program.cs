@@ -135,6 +135,7 @@ builder.Services.AddOpenApi(options =>
             schema.Properties ??= new Dictionary<string, IOpenApiSchema>();
             schema.Properties["correlationId"] = new OpenApiSchema { Type = JsonSchemaType.String };
         }
+        RondiTrack.Dtos.WireEnums.Apply(schema, context.JsonTypeInfo.Type);
         return Task.CompletedTask;
     });
 });
