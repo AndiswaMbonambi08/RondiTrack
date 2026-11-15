@@ -262,6 +262,7 @@ app.MapUserEndpoints();
 app.MapAuthEndpoints();
 app.MapStokvelEndpoints();
 app.MapStokvelDetailEndpoints();
+app.MapPayoutOrderEndpoints();
 app.MapContributionCycleEndpoints();
 app.MapPayoutEndpoints();
 app.MapPagedListEndpoints();
