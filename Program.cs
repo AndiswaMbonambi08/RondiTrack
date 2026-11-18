@@ -274,7 +274,11 @@ app.MapCloseEndpoints();
 
 // Migrations + demo seed, under one advisory lock so replicas queue instead of racing.
 // See Data/DatabaseInitializer.cs and the README (--scale api=2).
-await DatabaseInitializer.InitializeAsync(app.Services, app.Configuration);
+// The build-time OpenAPI generator starts this file with no database, so it skips the startup work.
+if (System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name != "GetDocument.Insider")
+{
+    await DatabaseInitializer.InitializeAsync(app.Services, app.Configuration);
+}
 
 app.Run();
 
