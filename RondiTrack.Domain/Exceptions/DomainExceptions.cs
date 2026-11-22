@@ -47,7 +47,10 @@ public class ConflictException : RondiTrackException
     public override int StatusCode => 409;
     public override string Title => "Conflict";
 
+    public string? Code { get; }
+
     public ConflictException(string message) : base(message) { }
+    public ConflictException(string message, string code) : base(message) => Code = code;
 }
 
 // Specifically for a reused Idempotency-Key with a different payload. Classified

@@ -69,6 +69,9 @@ public partial class RondiTrackExceptionHandler : IExceptionHandler
         var problemDetails = new ProblemDetails { Status = statusCode, Title = title, Detail = detail };
         problemDetails.Extensions["correlationId"] = correlationId;
 
+        if (exception is ConflictException { Code: not null } coded)
+            problemDetails.Extensions["code"] = coded.Code;
+
         if (exception is RequestValidationException { Errors.Count: > 0 } validation)
             problemDetails.Extensions["errors"] = validation.Errors;
 

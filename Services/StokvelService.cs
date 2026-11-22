@@ -1,4 +1,4 @@
-﻿// Owns RondiTrack's cross-entity decisions. Fetches from repositories, calls the domain
+// Owns RondiTrack's cross-entity decisions. Fetches from repositories, calls the domain
 // entity to enforce its own rules, and owns the idempotency check for contributions.
 using RondiTrack.Data;
 using RondiTrack.Domain;
@@ -78,9 +78,9 @@ public class StokvelService : IStokvelService
 
         // Same rules as /cycles and /me/home: PaidOut once the payout is processed, Closed once the job closed it.
         if (cycle.Status == CycleStatus.PayoutProcessed)
-            throw new ConflictException($"Cycle {cycle.Label} has already been paid out, so contributions can no longer be recorded for it.");
+            throw new ConflictException($"Cycle {cycle.Label} has already been paid out, so contributions can no longer be recorded for it.", "cycle-paid-out");
         if (cycle.ClosedAtUtc is not null)
-            throw new ConflictException($"Cycle {cycle.Label} is closed, so contributions can no longer be recorded for it.");
+            throw new ConflictException($"Cycle {cycle.Label} is closed, so contributions can no longer be recorded for it.", "cycle-closed");
 
         await _stokvelRepo.LoadContributionsAsync(stokvel, cycle.Id);
 
