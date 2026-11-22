@@ -4,7 +4,7 @@ namespace RondiTrack.Dtos;
 
 // Every filter arrives as text so a bad value is always a 400 from our own validation, never a
 // binding error that looks different. From and To are UTC instants: From is included, To is excluded.
-public record HistoryQuery(int? PageSize, string? PageToken, string? Member, string? From, string? To, string? Sort);
+public record HistoryQuery(int? PageSize, string? PageToken, string? Member, string? From, string? To, string? Sort, string? CycleId = null, string? Status = null);
 
 public record HistoryItemResponse(
     Guid Id,

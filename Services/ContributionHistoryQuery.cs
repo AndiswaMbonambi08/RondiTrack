@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using RondiTrack.Data;
+using RondiTrack.Domain;
 using RondiTrack.Dtos;
 using RondiTrack.Paging;
 
@@ -11,7 +12,7 @@ namespace RondiTrack.Services;
 // The time range is a half-open range of UTC instants: [From, To).
 public static partial class ContributionHistoryQuery
 {
-    public sealed record Parsed(Guid? Member, DateTime? From, DateTime? To, bool OldestFirst);
+    public sealed record Parsed(Guid? Member, DateTime? From, DateTime? To, bool OldestFirst, Guid? CycleId = null, ContributionStatus? Status = null);
 
     // "2026-09-30T22:00:00Z" or "2026-10-01T00:00:00+02:00". A date with no time, or an instant
     // with no zone, is refused: that is exactly how a date gets read as midnight UTC by mistake.
@@ -53,7 +54,23 @@ public static partial class ContributionHistoryQuery
             _ => throw new InvalidPagingException("sort must be 'newest' or 'oldest'.")
         };
 
-        return new Parsed(member, from, to, oldest);
+        Guid? cycle = null;
+        if (!string.IsNullOrWhiteSpace(q.CycleId))
+        {
+            if (!Guid.TryParse(q.CycleId, out var cid))
+                throw new InvalidPagingException("cycleId must be a cycle id.");
+            cycle = cid;
+        }
+
+        ContributionStatus? status = null;
+        if (!string.IsNullOrWhiteSpace(q.Status))
+        {
+            if (!Enum.TryParse<ContributionStatus>(q.Status.Trim(), true, out var st) || !Enum.IsDefined(st))
+                throw new InvalidPagingException("status must be Pending, Paid or Confirmed.");
+            status = st;
+        }
+
+        return new Parsed(member, from, to, oldest, cycle, status);
     }
 
     public static async Task<PagedResult<HistoryItemResponse>> ListAsync(
@@ -61,12 +78,14 @@ public static partial class ContributionHistoryQuery
     {
         var size = PageTokenCodec.ClampSize(q.PageSize);
         // The token is only good for THIS list: same stokvel, member, range and sort.
-        var hash = PageTokenCodec.Hash($"{stokvelId}|{member}|{p.From:O}|{p.To:O}|{p.OldestFirst}");
+        var hash = PageTokenCodec.Hash($"{stokvelId}|{member}|{p.From:O}|{p.To:O}|{p.OldestFirst}|{p.CycleId}|{p.Status}");
 
         var mine = db.Contributions.AsNoTracking().Where(c => c.StokvelId == stokvelId);
         if (member is { } m) mine = mine.Where(c => c.UserId == m);
         if (p.From is { } f) mine = mine.Where(c => c.RecordedAt >= f);   // included
-        if (p.To is { } t) mine = mine.Where(c => c.RecordedAt < t);       // excluded
+        if (p.To is { } t) mine = mine.Where(c => c.RecordedAt < t);
+        if (p.CycleId is { } cy) mine = mine.Where(c => c.ContributionCycleId == cy);
+        if (p.Status is { } s) mine = mine.Where(c => c.Status == s);       // excluded
 
         if (!string.IsNullOrEmpty(q.PageToken))
         {
