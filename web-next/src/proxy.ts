@@ -33,6 +33,7 @@ export async function proxy(request: NextRequest) {
   // No session.
   if (!session) {
     if (isBff(pathname)) return unauthenticatedJson(Boolean(raw))
+    if (pathname === '/join') return NextResponse.next()
     if (isAuthPage) {
       const res = NextResponse.next()
       if (raw) res.cookies.delete(SESSION_COOKIE)

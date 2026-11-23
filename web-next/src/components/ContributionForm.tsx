@@ -72,6 +72,7 @@ export function ContributionForm(p: Props) {
               name="memberId"
               defaultValue={state.values.memberId}
               aria-invalid={state.fieldErrors.memberId ? true : undefined}
+              aria-describedby={state.fieldErrors.memberId ? 'memberId-error' : undefined}
               className={field}
             >
               {p.members.map((m) => (
@@ -81,7 +82,7 @@ export function ContributionForm(p: Props) {
                 </option>
               ))}
             </select>
-            {state.fieldErrors.memberId && <p className={fieldError}>{state.fieldErrors.memberId}</p>}
+            {state.fieldErrors.memberId && <p id="memberId-error" className={fieldError}>{state.fieldErrors.memberId}</p>}
           </div>
         ) : (
           <input type="hidden" name="memberId" value={p.selfId} />

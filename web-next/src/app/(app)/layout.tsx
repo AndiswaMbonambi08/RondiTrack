@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
+import Link from 'next/link'
 import { logout } from '@/app/actions/auth'
 import { AppShell } from '@/components/AppShell'
 import { PinsOwner } from '@/components/PinsOwner'
@@ -9,10 +10,20 @@ import { ToastProvider } from '@/components/ToastProvider'
 import { SignOutForm } from '@/components/SignOutForm'
 import { getSession } from '@/lib/session'
 
+// Every page under this layout is noindex, set once here and not page by page.
+// robots.txt must NOT Disallow these pages: a crawler that cannot fetch a page never sees its noindex.
+export const metadata: Metadata = { robots: { index: false, follow: false } }
+
 // The session is read inside <Suspense>, so the sidebar frame streams immediately.
 async function SignedInAs() {
   const session = await getSession()
-  if (!session) redirect('/login')
+  if (!session) {
+    return (
+      <Link href="/login" className="text-sm font-semibold underline">
+        Sign in
+      </Link>
+    )
+  }
   return (
     <div className="space-y-3 text-sm">
       <p className="break-words">

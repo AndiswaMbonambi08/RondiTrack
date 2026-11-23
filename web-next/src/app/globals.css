@@ -92,3 +92,9 @@
     @apply bg-background text-foreground;
   }
 }
+@layer base {
+  html {
+    scroll-padding-top: 5rem;
+    scroll-padding-bottom: 7rem;
+  }
+}

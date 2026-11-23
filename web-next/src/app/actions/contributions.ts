@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { signedInApi } from '@/lib/api'
 import { ApiError } from '@/lib/apiError'
 import { describeContributionError } from '@/lib/contributionErrors'
+import { chooseKey, intentOf } from '@/lib/idempotency'
 import { parseRetryAfter } from '@/lib/retryAfter'
 import { deleteSession } from '@/lib/session'
 import { parseRandsToCents } from '@/money/money'
@@ -97,8 +98,8 @@ export async function recordContribution(
   }
 
   // The 7.4 key table: the same payment keeps its key, a changed amount or member is a new payment.
-  const intent = [raw.stokvelId, raw.cycleId, raw.memberId, cents].join('|')
-  const key = keyIntentIn !== '' && keyIntentIn !== intent ? crypto.randomUUID() : keyIn
+  const intent = intentOf(raw.stokvelId, raw.cycleId, raw.memberId, cents)
+  const key = chooseKey(keyIn, keyIntentIn, intent)
 
   // 3. The API.
   let result
