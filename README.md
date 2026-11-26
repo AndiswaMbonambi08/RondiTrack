@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AndiswaMbonambi08/RondiTrack/actions/workflows/ci.yml/badge.svg)](https://github.com/AndiswaMbonambi08/RondiTrack/actions/workflows/ci.yml)
 
-RondiTrack is a stokvel (rotating savings group) tracker. Members pay contributions into a cycle, treasurers confirm them, close the cycle and record payouts. The API models the real rules of a stokvel in code so invalid states can't happen, and it treats money, retries and personal information carefully.
+RondiTrack is a stokvel (rotating savings group) tracker. Members pay contributions into a cycle, treasurers confirm them, close the cycle and record payouts. The API models the real rules of a stokvel in code so invalid states can't happen and it treats money, retries and personal information carefully.
 
 ## What it does
 
